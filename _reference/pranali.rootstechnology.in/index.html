@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - CTA Apparels</title>
+    <link href="../cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="login.css">
+    <style>
+        body {
+            background-color: #ffffff;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 360px;
+            padding: 20px;
+        }
+
+        .custom-input {
+            background-color: #e6e6e6;
+            border: none;
+            height: 45px;
+            text-align: center;
+            font-size: 14px;
+            border-radius: 10px;
+        }
+
+        .custom-input:focus {
+            box-shadow: none;
+            outline: none;
+            background-color: #e6e6e6;
+        }
+
+        .btn-primary {
+            background-color: #5a62ea;
+            border: none;
+            height: 40px;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary:hover {
+            background-color: #4954d4;
+        }
+    </style>
+</head>
+
+<body class="d-flex align-items-center justify-content-center vh-100 bg-white">
+
+    <div class="login-container text-center">
+        <img src="assets/images/dashboardtop/logo.png" alt="CTA Apparels Logo" class="mb-3" width="200" />
+
+        <form action="#" method="POST">
+
+            <div class="mb-3">
+                <input type="text" class="form-control custom-input" name="email" id="email" placeholder="USERNAME" required />
+            </div>
+            <div class="mb-3">
+                <input type="password" class="form-control custom-input" name="password" id="password" placeholder="PASSWORD" required />
+            </div>
+            <button type="submit" class="btn btn-primary w-50 rounded-pill">SUBMIT</button>
+        </form>
+    </div>
+
+</body>
+
+</html>
