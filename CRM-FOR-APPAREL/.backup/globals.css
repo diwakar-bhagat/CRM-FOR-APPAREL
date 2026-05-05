@@ -1,0 +1,144 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "./aura.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-surface-1: hsl(var(--surface-1));
+  --color-surface-2: hsl(var(--surface-2));
+  --color-surface-3: hsl(var(--surface-3));
+  --color-border: hsl(var(--border));
+  --color-border-subtle: hsl(var(--border-subtle));
+  --color-foreground-muted: hsl(var(--foreground-muted));
+  --color-foreground-subtle: hsl(var(--foreground-subtle));
+  
+  --color-status-on-track: hsl(var(--status-on-track));
+  --color-status-at-risk: hsl(var(--status-at-risk));
+  --color-status-delayed: hsl(var(--status-delayed));
+  --color-status-completed: hsl(var(--status-completed));
+  --color-status-pending: hsl(var(--status-pending));
+  
+  --color-status-on-track-bg: hsl(var(--status-on-track-bg));
+  --color-status-at-risk-bg: hsl(var(--status-at-risk-bg));
+  --color-status-delayed-bg: hsl(var(--status-delayed-bg));
+  --color-status-completed-bg: hsl(var(--status-completed-bg));
+
+  --color-tna-node-active: hsl(var(--tna-node-active));
+  --color-tna-node-complete: hsl(var(--tna-node-complete));
+  --color-tna-node-delayed: hsl(var(--tna-node-delayed));
+  --color-tna-connector-track: hsl(var(--tna-connector-track));
+  --color-tna-connector-fill: hsl(var(--tna-connector-fill));
+
+  /* Overrides for shadcn */
+  --color-card: hsl(var(--surface-1));
+  --color-card-foreground: hsl(var(--foreground));
+  --color-popover: hsl(var(--surface-2));
+  --color-popover-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--status-completed));
+  --color-primary-foreground: hsl(var(--background));
+  --color-secondary: hsl(var(--surface-2));
+  --color-secondary-foreground: hsl(var(--foreground));
+  --color-muted: hsl(var(--surface-3));
+  --color-muted-foreground: hsl(var(--foreground-muted));
+  --color-accent: hsl(var(--surface-2));
+  --color-accent-foreground: hsl(var(--foreground));
+  --color-destructive: hsl(var(--status-delayed));
+  --color-input: hsl(var(--border));
+  --color-ring: hsl(var(--border));
+
+  --font-sans: 'Geist', 'Inter', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+  --font-heading: var(--font-sans);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: 0 0% 100%;
+  --surface-1: 0 0% 98%;
+  --surface-2: 0 0% 96%;
+  --surface-3: 0 0% 93%;
+  --border: 0 0% 89.8%;
+  --border-subtle: 0 0% 94%;
+  --foreground: 0 0% 3.9%;
+  --foreground-muted: 0 0% 45%;
+  --foreground-subtle: 0 0% 64%;
+
+  --status-on-track: 142 71% 45%;
+  --status-at-risk: 38 92% 50%;
+  --status-delayed: 0 84% 60%;
+  --status-completed: 221 83% 53%;
+  --status-pending: 270 50% 60%;
+
+  --status-on-track-bg: 142 71% 45% / 0.08;
+  --status-at-risk-bg: 38 92% 50% / 0.08;
+  --status-delayed-bg: 0 84% 60% / 0.08;
+  --status-completed-bg: 221 83% 53% / 0.08;
+
+  --glass-bg: 255 255 255 / 0.6;
+  --glass-border: 255 255 255 / 0.2;
+  --glass-blur: blur(12px);
+
+  --tna-node-active: 221 83% 53%;
+  --tna-node-complete: 142 71% 45%;
+  --tna-node-delayed: 0 84% 60%;
+  --tna-connector-track: 0 0% 89.8%;
+  --tna-connector-fill: 221 83% 53%;
+
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: 0 0% 3.9%;
+  --surface-1: 0 0% 6%;
+  --surface-2: 0 0% 8.5%;
+  --surface-3: 0 0% 11%;
+  --border: 0 0% 14.9%;
+  --border-subtle: 0 0% 11%;
+  --foreground: 0 0% 98%;
+  --foreground-muted: 0 0% 60%;
+  --foreground-subtle: 0 0% 40%;
+
+  --status-on-track: 142 71% 45%;
+  --status-at-risk: 38 92% 50%;
+  --status-delayed: 0 84% 60%;
+  --status-completed: 221 83% 53%;
+  --status-pending: 270 50% 60%;
+
+  --status-on-track-bg: 142 71% 45% / 0.08;
+  --status-at-risk-bg: 38 92% 50% / 0.08;
+  --status-delayed-bg: 0 84% 60% / 0.08;
+  --status-completed-bg: 221 83% 53% / 0.08;
+
+  --glass-bg: 0 0% 6% / 0.7;
+  --glass-border: 255 255 255 / 0.06;
+  --glass-blur: blur(12px);
+
+  --tna-node-active: 221 83% 53%;
+  --tna-node-complete: 142 71% 45%;
+  --tna-node-delayed: 0 84% 60%;
+  --tna-connector-track: 0 0% 20%;
+  --tna-connector-fill: 221 83% 53%;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}

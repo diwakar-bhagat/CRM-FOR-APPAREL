@@ -1,0 +1,28 @@
+node_modules
+.next
+.git
+.DS_Store
+*.local
+.env
+.env.production
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+Dockerfile
+.dockerignore
+
+# Captured legacy ERP/reference artifacts. They are useful locally, but must not
+# inflate Render/Docker build context or trigger framework scanners.
+Dashboard.html
+saved_resource.html
+erp.ctaapparels.com
+index-*.js
+index-*.css
+login-*.css
+SetAvatar-*.css
+TaskManager-*.css
+showVGOrderItem-*.css
+v8c78df7c7c0f484497ecbca7046644da1771523124516
+_reference
+clerk-nextjs
