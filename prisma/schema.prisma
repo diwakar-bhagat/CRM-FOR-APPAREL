@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Order {
+  id               String   @id @default(cuid())
+  orderNo          String   @unique
+  styleDescription String
+  specialWork      String?
+  sam              Float?
+  totalQty         Int?
+  qty              Int
+  buyer            Buyer    @relation(fields: [buyerId], references: [id])
+  buyerId          String
+  unit             Unit     @relation(fields: [unitId], references: [id])
+  unitId           String
+  fabricSupplier   String?
+  fabricInhDate    DateTime?
+  exFactoryDate    DateTime?
+  revisedExFactory DateTime?
+  raplanDate       DateTime?
+  raActualDate     DateTime?
+  pcdPlan          DateTime?
+  fileHoDate       DateTime?
+  finalPcdClosure  DateTime?
+  rdDate           DateTime?
+  ppComments       String?
+  remarks          String?
+  planStatus       String?
+  fob              Float?
+  totalCost        Float?
+  producedSam      Float?
+  prodLeadTime     Int?
+  month            String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  productionEntries ProductionEntry[]
+  weeklyOutputs     WeeklyOutput[]
+  drEntries         DREntry[]
+  trimStatus        TrimEntry[]
+  riskFlags         RiskFlag[]
+}
+
+model Buyer {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  orders   Order[]
+  drEntries DREntry[]
+}
+
+model Unit {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  orders    Order[]
+  drEntries DREntry[]
+}
+
+model ProductionEntry {
+  id                  String   @id @default(cuid())
+  order               Order    @relation(fields: [orderId], references: [id])
+  orderId             String
+  entryDate           DateTime
+  productionTillDate  DateTime?
+  balanceStitchQty    Int?
+  finishingTillDate   DateTime?
+  balanceFinishQty    Int?
+  cuttingTillDate     DateTime?
+  balanceCuttingQty   Int?
+  specialWorkTillDate DateTime?
+  balanceSpecialWork  Int?
+  noOfLines           Int?
+  createdAt           DateTime @default(now())
+}
+
+model WeeklyOutput {
+  id        String   @id @default(cuid())
+  order     Order    @relation(fields: [orderId], references: [id])
+  orderId   String
+  weekNo    Int
+  weekStart DateTime
+  qty       Int?
+  createdAt DateTime @default(now())
+}
+
+model DREntry {
+  id               String   @id @default(cuid())
+  srNo             Int
+  buyer            Buyer    @relation(fields: [buyerId], references: [id])
+  buyerId          String
+  orderNo          String
+  styleDescription String
+  specialWork      String?
+  qty              Int
+  tod              DateTime
+  wkNumber         Int?
+  onMachine        String?
+  offMachine       String?
+  remarks          String?
+  unit             Unit     @relation(fields: [unitId], references: [id])
+  unitId           String
+  sheetSource      String?
+  order            Order?   @relation(fields: [orderId], references: [id])
+  orderId          String?
+  createdAt        DateTime @default(now())
+
+  @@unique([sheetSource, srNo, orderNo])
+}
+
+model RiskFlag {
+  id        String   @id @default(cuid())
+  order     Order    @relation(fields: [orderId], references: [id])
+  orderId   String
+  riskType  String
+  severity  String
+  detail    String?
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model TrimEntry {
+  id         String   @id @default(cuid())
+  order      Order    @relation(fields: [orderId], references: [id])
+  orderId    String
+  trimStatus String
+  remarks    String?
+  updatedAt  DateTime @updatedAt
+}
+
+model MonthlySummary {
+  id          String   @id @default(cuid())
+  month       DateTime
+  buyerName   String
+  planToShip  Int?
+  stitchedQty Int?
+  balToSew    Int?
+  createdAt   DateTime @default(now())
+
+  @@unique([month, buyerName])
+}
+
+model MillReport {
+  id             String   @id @default(cuid())
+  reffNo         String
+  vgReffNo       String?
+  sentDate       DateTime?
+  sentBy         String?
+  deadlineMargin String?
+  status         String?
+  reportType     String
+  createdAt      DateTime @default(now())
+}
+
+model FobApproval {
+  id        String   @id @default(cuid())
+  reffNo    String
+  vgReffNo  String?
+  buyer     String
+  brand     String?
+  styleNo   String?
+  styleName String?
+  reqDate   DateTime?
+  status    String
+  createdAt DateTime @default(now())
+}
+
+model Design {
+  id        String   @id @default(cuid())
+  galleryId Int      @unique
+  styleNo   String
+  buyer     String
+  designer  String?
+  season    String?
+  status    String
+  imageUrl  String?
+  createdAt DateTime @default(now())
+}
+
+model MaterialRequisition {
+  id              String            @id @default(cuid())
+  requisitionNo   String?
+  requisitionDate DateTime
+  company         String            @default("CTA APPARELS PVT. LTD.")
+  reqnType        String
+  requisitionFor  String
+  buyer           String?
+  season          String?
+  forLocation     String?
+  preparedBy      String?
+  deptFrom        String?
+  deptTo          String?
+  items           MaterialReqItem[]
+  createdAt       DateTime          @default(now())
+}
+
+model MaterialReqItem {
+  id            String              @id @default(cuid())
+  requisition   MaterialRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  requisitionId String
+  itemCategory  String
+  itemDesc      String
+  color         String?
+  width         String?
+  unit          String?
+  reqnQty       Float?
+  rate          Float?
+  reqOn         DateTime?
+  remark        String?
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  reffNo    String
+  styleName String?
+  message   String
+  createdBy String?
+  isRead    Boolean  @default(false)
+  type      String
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      String   @default("MERCHANDISER")
+  createdAt DateTime @default(now())
+}

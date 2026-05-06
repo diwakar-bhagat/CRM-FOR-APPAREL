@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('node:fs');
 const cheerio = require('cheerio');
 
 const html = fs.readFileSync('legacy_dashboard.html', 'utf8');
@@ -6,7 +6,7 @@ const $ = cheerio.load(html);
 
 const orders = [];
 
-$('table.sticky-table tbody tr').each((i, row) => {
+$('table.sticky-table tbody tr').each((_i, row) => {
   const tds = $(row).find('td');
   if (tds.length < 11) return; // Skip if not a full data row
 

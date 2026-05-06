@@ -1,0 +1,14 @@
+# Generated files
+generated/
+node_modules/
+.next/
+dist/
+build/
+
+# Legacy assets
+legacy_assets/
+_reference/
+
+# Build outputs
+*.config.js
+*.config.ts
