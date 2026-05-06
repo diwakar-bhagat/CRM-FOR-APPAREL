@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ok, serverError, validationError } from '@/lib/api-response';
+import { parsePagination } from '@/lib/parse-utils';
 import { prisma } from '@/lib/prisma';
 
 const getFabricWorkingSchema = z.object({
