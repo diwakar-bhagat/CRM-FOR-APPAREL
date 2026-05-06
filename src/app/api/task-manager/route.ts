@@ -59,25 +59,25 @@ export async function GET(request: Request) {
       prisma.order.count({ where }),
     ]);
 
-    const enrichedOrders = orders.map((order) => ({
+    const enrichedOrders = orders.map((order: any) => ({
       ...order,
       vgLinked: Boolean(order.fileHoDate),
       ra: {
         fabrics: [
-          order.productionEntries.filter((entry) => (entry.balanceStitchQty ?? 0) > 0).length,
-          order.productionEntries.filter((entry) => (entry.balanceStitchQty ?? 0) === 0).length,
+          order.productionEntries.filter((entry: any) => (entry.balanceStitchQty ?? 0) > 0).length,
+          order.productionEntries.filter((entry: any) => (entry.balanceStitchQty ?? 0) === 0).length,
           order.productionEntries.length,
-          order.productionEntries.reduce((sum, entry) => sum + (entry.balanceStitchQty ?? 0), 0),
+          order.productionEntries.reduce((sum: number, entry: any) => sum + (entry.balanceStitchQty ?? 0), 0),
         ] as number[],
         trims: [
-          order.trimStatus.filter((item) => item.trimStatus.toLowerCase() === "awaited").length,
-          order.trimStatus.filter((item) => item.trimStatus.toLowerCase() === "partial").length,
-          order.trimStatus.filter((item) => item.trimStatus.toLowerCase() === "ok").length,
+          order.trimStatus.filter((item: any) => item.trimStatus.toLowerCase() === "awaited").length,
+          order.trimStatus.filter((item: any) => item.trimStatus.toLowerCase() === "partial").length,
+          order.trimStatus.filter((item: any) => item.trimStatus.toLowerCase() === "ok").length,
           order.trimStatus.length,
         ] as number[],
         bulkProcess: order.productionEntries.length,
         fob: order.fob ?? 0,
-        bulkEmb: order.productionEntries.reduce((sum, item) => sum + (item.balanceSpecialWork ?? 0), 0),
+        bulkEmb: order.productionEntries.reduce((sum: number, item: any) => sum + (item.balanceSpecialWork ?? 0), 0),
         rdGradedPattern: Boolean(order.rdDate),
         pfh: order.fileHoDate ? 1 : 0,
         rd: order.rdDate ? 1 : 0,

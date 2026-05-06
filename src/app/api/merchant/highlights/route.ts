@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 export async function GET() {
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({ success: false, error: "Service misconfigured" }, { status: 503 });
+  }
+
   try {
     // 1. Fetch Production File Handover (recently completed pfh_status)
     const pfhRows = await sql`
@@ -44,13 +48,16 @@ export async function GET() {
     `;
 
     return NextResponse.json({
-      pfh: pfhRows,
-      risk: riskRows,
-      ppm: ppmRows,
-      labDips: labDips,
+      success: true,
+      data: {
+        pfh: pfhRows,
+        risk: riskRows,
+        ppm: ppmRows,
+        labDips: labDips,
+      },
     });
   } catch (error) {
-    console.error("Merchant Highlights GET Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("[merchant:highlights:get] failed:", (error as Error).message);
+    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
   }
 }

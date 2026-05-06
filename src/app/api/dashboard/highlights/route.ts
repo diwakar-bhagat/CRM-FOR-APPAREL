@@ -41,7 +41,7 @@ export async function GET() {
     ]);
 
     const data = {
-      productionFileHandover: productionFileHandover.map((entry) => ({
+      productionFileHandover: productionFileHandover.map((entry: any) => ({
         reffNo: entry.orderNo,
         vgReffNo: null,
         buyer: entry.buyer.name,
@@ -49,7 +49,7 @@ export async function GET() {
         styleNo: null,
         styleName: entry.styleDescription,
       })),
-      riskAnalysis: riskAnalysis.map((flag) => ({
+      riskAnalysis: riskAnalysis.map((flag: any) => ({
         reffNo: flag.order.orderNo,
         vgReffNo: null,
         buyer: flag.order.buyer.name,
@@ -59,7 +59,7 @@ export async function GET() {
         riskType: flag.riskType,
         severity: flag.severity,
       })),
-      ppmReport: ppmReport.map((order) => ({
+      ppmReport: ppmReport.map((order: any) => ({
         reffNo: order.orderNo,
         vgReffNo: null,
       })),

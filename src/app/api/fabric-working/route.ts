@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       prisma.order.count({ where }),
     ]);
 
-    const normalized = orders.map((order) => {
+    const normalized = orders.map((order: any) => {
       const latestEntry = order.productionEntries[0];
       const pendingItems = Math.max(
         0,
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
 
     const filtered =
       status !== 'All Items'
-        ? normalized.filter((order) => order.fabricStatus === status)
+        ? normalized.filter((order: any) => order.fabricStatus === status)
         : normalized;
 
     const pages = Math.ceil(total / limit);

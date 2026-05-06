@@ -3,10 +3,15 @@ import { neon, neonConfig } from "@neondatabase/serverless";
 // Configure Neon to use HTTP fetch
 neonConfig.fetchConnectionCache = true;
 
-// Define a placeholder SQL executor if the database URL isn't present
-// This ensures Next.js can compile pages without breaking on missing DB env vars
+let hasWarnedMissingDatabase = false;
+
+// Define a placeholder SQL executor if the database URL isn't present.
+// Routes should return 503 before hitting this function.
 const mockSql = async (strings: TemplateStringsArray, ...values: any[]) => {
-  console.warn("Neon DB not configured. Missing DATABASE_URL.");
+  if (!hasWarnedMissingDatabase && process.env.NODE_ENV === "development") {
+    console.warn("[DB] DATABASE_URL not configured");
+    hasWarnedMissingDatabase = true;
+  }
   return [];
 };
 

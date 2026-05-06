@@ -1,8 +1,24 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { sql } from "@/lib/db";
 
+const patchSchema = z
+  .object({
+    id: z.string().min(1),
+    orderQty: z.number().optional(),
+    totalReqdQty: z.number().optional(),
+    statusRed: z.number().int().min(0).optional(),
+    statusOrange: z.number().int().min(0).optional(),
+    statusGreen: z.number().int().min(0).optional(),
+  })
+  .strict();
+
 export async function GET() {
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({ success: false, error: "Service misconfigured" }, { status: 503 });
+  }
+
   try {
     const rows = await sql`
       SELECT 
@@ -23,21 +39,31 @@ export async function GET() {
       ORDER BY o.delivery_date ASC
     `;
 
-    return NextResponse.json({ data: rows });
+    return NextResponse.json({ success: true, data: rows });
   } catch (error) {
-    console.error("Fabric GET Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("[merchant:fabric:get] failed:", (error as Error).message);
+    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
   }
 }
 
 export async function PATCH(request: Request) {
-  try {
-    const body = await request.json();
-    const { id, orderQty, totalReqdQty, statusRed, statusOrange, statusGreen } = body;
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({ success: false, error: "Service misconfigured" }, { status: 503 });
+  }
 
-    if (!id) {
-      return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
+  try {
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
     }
+    const parsed = patchSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: "Validation failed" }, { status: 400 });
+    }
+    const body = parsed.data;
+    const { id, orderQty, totalReqdQty, statusRed, statusOrange, statusGreen } = body;
 
     if (orderQty !== undefined || totalReqdQty !== undefined) {
       await sql`
@@ -61,9 +87,9 @@ export async function PATCH(request: Request) {
       `;
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, data: { updated: true } });
   } catch (error) {
-    console.error("Fabric PATCH Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("[merchant:fabric:patch] failed:", (error as Error).message);
+    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
   }
 }

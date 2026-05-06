@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 export async function POST() {
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({ success: false, error: "Service misconfigured" }, { status: 503 });
+  }
+
   try {
     // 1. Add new columns to orders if they don't exist
     await sql`
@@ -70,13 +74,12 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: "Merchant dashboard tables created and seeded successfully.",
+      data: {
+        message: "Merchant dashboard tables created and seeded successfully.",
+      },
     });
   } catch (error) {
-    console.error("Merchant Setup Error:", error);
-    return NextResponse.json(
-      { error: "Migration failed", details: String(error) },
-      { status: 500 }
-    );
+    console.error("[setup-merchant:post] failed:", (error as Error).message);
+    return NextResponse.json({ success: false, error: "Migration failed" }, { status: 500 });
   }
 }

@@ -4,10 +4,14 @@ import fs from "fs";
 import path from "path";
 
 export async function POST() {
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({ success: false, error: "Service misconfigured" }, { status: 503 });
+  }
+
   try {
     const filePath = path.join(process.cwd(), "legacy_data.json");
     if (!fs.existsSync(filePath)) {
-      return NextResponse.json({ error: "legacy_data.json not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "legacy_data.json not found" }, { status: 404 });
     }
 
     const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -70,9 +74,9 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({ success: true, count: data.length });
+    return NextResponse.json({ success: true, data: { count: data.length } });
   } catch (error) {
-    console.error("Seed Error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    console.error("[seed-legacy:post] failed:", (error as Error).message);
+    return NextResponse.json({ success: false, error: "Seed failed" }, { status: 500 });
   }
 }

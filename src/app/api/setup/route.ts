@@ -11,6 +11,10 @@ import { sql } from "@/lib/db";
  * ⚠ This should be removed or protected in production.
  */
 export async function POST() {
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({ success: false, error: "Service misconfigured" }, { status: 503 });
+  }
+
   try {
     // ── Settings table ──────────────────────────
     await sql`
@@ -80,14 +84,13 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: "Migration completed. Tables: settings, products, samples created/verified.",
-      tables: ["settings", "products", "samples"],
+      data: {
+        message: "Migration completed. Tables: settings, products, samples created/verified.",
+        tables: ["settings", "products", "samples"],
+      },
     });
   } catch (error) {
-    console.error("Setup Migration Error:", error);
-    return NextResponse.json(
-      { error: "Migration failed", details: String(error) },
-      { status: 500 },
-    );
+    console.error("[setup:post] failed:", (error as Error).message);
+    return NextResponse.json({ success: false, error: "Migration failed" }, { status: 500 });
   }
 }

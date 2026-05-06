@@ -13,7 +13,7 @@ export async function GET(request: Request) {
         select: { name: true },
         orderBy: { name: "asc" },
       });
-      return ok(buyers.map((buyer) => buyer.name));
+      return ok(buyers.map((buyer: any) => buyer.name));
     }
     
     if (distinct === "months") {
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         select: { month: true },
         orderBy: { month: "asc" },
       });
-      return ok(months.map((item) => item.month));
+      return ok(months.map((item: any) => item.month));
     }
 
     const parsedPagination = paginationQuerySchema.safeParse({

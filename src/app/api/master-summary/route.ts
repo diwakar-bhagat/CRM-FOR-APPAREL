@@ -15,8 +15,8 @@ export async function GET() {
       },
     });
 
-    const buyers = [...new Set(summaries.map((item) => item.buyerName))];
-    const months = [...new Set(summaries.map((item) => item.month.toISOString().slice(0, 7)))];
+    const buyers = [...new Set(summaries.map((item: any) => item.buyerName))];
+    const months = [...new Set(summaries.map((item: any) => item.month.toISOString().slice(0, 7)))];
 
     return ok({ summaries, buyers, months });
   } catch (error) {
