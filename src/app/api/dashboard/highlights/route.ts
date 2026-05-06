@@ -4,32 +4,28 @@ import { sql } from "@/lib/db";
 export async function GET() {
   try {
     const productionFileHandover = await sql`
-      SELECT o."orderNo", o."styleDescription", b.name AS "buyerName"
-      FROM public."Order" o
-      JOIN public."Buyer" b ON b.id = o."buyerId"
-      WHERE o."fileHoDate" IS NOT NULL
-      ORDER BY o."fileHoDate" DESC
+      SELECT o.ref_no AS "orderNo", o.style_name AS "styleDescription", o.buyer AS "buyerName"
+      FROM public.orders o
+      ORDER BY o.delivery_date ASC NULLS LAST
       LIMIT 50
     `;
     const riskAnalysis = await sql`
       SELECT
-        r."riskType",
-        r.severity,
-        o."orderNo",
-        o."styleDescription",
-        b.name AS "buyerName"
-      FROM public."RiskFlag" r
-      JOIN public."Order" o ON o.id = r."orderId"
-      JOIN public."Buyer" b ON b.id = o."buyerId"
-      WHERE r.resolved = false
-      ORDER BY r."createdAt" DESC
+        'DELIVERY_RISK' AS "riskType",
+        CASE WHEN o.delivery_date < NOW() THEN 'high' ELSE 'medium' END AS severity,
+        o.ref_no AS "orderNo",
+        o.style_name AS "styleDescription",
+        o.buyer AS "buyerName"
+      FROM public.orders o
+      WHERE o.delivery_date IS NOT NULL
+      ORDER BY o.delivery_date ASC
       LIMIT 50
     `;
     const ppmReport = await sql`
-      SELECT "orderNo"
-      FROM public."Order"
-      WHERE "ppComments" IS NOT NULL
-      ORDER BY "updatedAt" DESC
+      SELECT ref_no AS "orderNo"
+      FROM public.orders
+      WHERE ppm_status IS NOT NULL
+      ORDER BY updated_at DESC
       LIMIT 50
     `;
 

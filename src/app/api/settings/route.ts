@@ -4,6 +4,34 @@ import { sql } from "@/lib/db";
 import { CACHE_KEYS, SETTINGS_CACHE_TTL, redis } from "@/lib/redis";
 import type { GlobalConfig } from "@/types/app";
 
+const DEFAULT_SETTINGS: Record<string, string> = {
+  currency: "INR",
+  currency_symbol: "₹",
+  currency_locale: "en-IN",
+  location: "India",
+  company_name: "CTA Apparels",
+  timezone: "Asia/Kolkata",
+};
+
+async function ensureSettingsTable() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.settings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      key TEXT UNIQUE NOT NULL,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+    await sql`
+      INSERT INTO public.settings (key, value)
+      VALUES (${key}, ${value})
+      ON CONFLICT (key) DO NOTHING
+    `;
+  }
+}
+
 /**
  * GET /api/settings
  *
@@ -17,6 +45,8 @@ export async function GET() {
     if (cached) {
       return NextResponse.json({ settings: cached, cached: true });
     }
+
+    await ensureSettingsTable();
 
     // 2. Cache miss — read from Neon
     const rows = await sql`SELECT key, value FROM public.settings`;
@@ -41,7 +71,7 @@ export async function GET() {
 
     return NextResponse.json({ settings, cached: false });
   } catch (error) {
-    console.error("Settings GET Error:", error);
+    console.error("[settings:get] failed:", (error as Error).message);
     return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });
   }
 }
@@ -55,6 +85,7 @@ export async function GET() {
  */
 export async function PATCH(request: Request) {
   try {
+    await ensureSettingsTable();
     const body = await request.json();
 
     // Map camelCase keys back to snake_case for the DB
@@ -95,7 +126,7 @@ export async function PATCH(request: Request) {
       message: `Updated ${updatedCount} setting(s).`,
     });
   } catch (error) {
-    console.error("Settings PATCH Error:", error);
+    console.error("[settings:patch] failed:", (error as Error).message);
     return NextResponse.json({ error: "Failed to update settings" }, { status: 500 });
   }
 }

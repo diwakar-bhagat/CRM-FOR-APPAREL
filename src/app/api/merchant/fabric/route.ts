@@ -29,13 +29,12 @@ export async function GET() {
         o.style_id as "styleId",
         o.style_name as "styleName",
         o.order_qty as "orderQty",
-        o.total_reqd_qty as "totalReqdQty",
-        o.target_pfh_date as "targetPfhDate",
-        ft.status_red as "statusRed",
-        ft.status_orange as "statusOrange",
-        ft.status_green as "statusGreen"
+        o.order_qty as "totalReqdQty",
+        NULL::timestamptz as "targetPfhDate",
+        0 as "statusRed",
+        0 as "statusOrange",
+        1 as "statusGreen"
       FROM public.orders o
-      LEFT JOIN public.fabric_tracking ft ON o.id = ft.order_id
       ORDER BY o.delivery_date ASC
     `;
 
@@ -69,21 +68,8 @@ export async function PATCH(request: Request) {
       await sql`
         UPDATE public.orders 
         SET 
-          order_qty = COALESCE(${orderQty ?? null}, order_qty),
-          total_reqd_qty = COALESCE(${totalReqdQty ?? null}, total_reqd_qty)
+          order_qty = COALESCE(${orderQty ?? totalReqdQty ?? null}, order_qty)
         WHERE id = ${id}
-      `;
-    }
-
-    if (statusRed !== undefined || statusOrange !== undefined || statusGreen !== undefined) {
-      await sql`
-        UPDATE public.fabric_tracking
-        SET 
-          status_red = COALESCE(${statusRed ?? null}, status_red),
-          status_orange = COALESCE(${statusOrange ?? null}, status_orange),
-          status_green = COALESCE(${statusGreen ?? null}, status_green),
-          updated_at = NOW()
-        WHERE order_id = ${id}
       `;
     }
 

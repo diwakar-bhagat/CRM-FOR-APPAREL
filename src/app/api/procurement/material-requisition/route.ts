@@ -10,8 +10,46 @@ const getMaterialRequisitionSchema = paginationQuerySchema.extend({
   year: z.string().optional(),
 });
 
+async function ensureMaterialRequisitionTables() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.material_requisitions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      requisition_no TEXT,
+      requisition_date TIMESTAMPTZ NOT NULL,
+      company TEXT NOT NULL DEFAULT 'CTA APPARELS PVT. LTD.',
+      reqn_type TEXT NOT NULL,
+      requisition_for TEXT NOT NULL,
+      buyer TEXT,
+      season TEXT,
+      for_location TEXT,
+      prepared_by TEXT,
+      dept_from TEXT,
+      dept_to TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.material_requisition_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      requisition_id UUID NOT NULL REFERENCES public.material_requisitions(id) ON DELETE CASCADE,
+      item_category TEXT NOT NULL,
+      item_desc TEXT NOT NULL,
+      color TEXT,
+      width TEXT,
+      unit TEXT,
+      reqn_qty NUMERIC,
+      rate NUMERIC,
+      req_on TIMESTAMPTZ,
+      remark TEXT
+    )
+  `;
+}
+
 export async function GET(request: Request) {
   try {
+    await ensureMaterialRequisitionTables();
+
     const url = new URL(request.url);
     const params = {
       type: url.searchParams.get("type"),
@@ -35,74 +73,74 @@ export async function GET(request: Request) {
     const requisitions = await sql`
       SELECT
         mr.id,
-        mr."requisitionNo",
-        mr."requisitionDate",
+        mr.requisition_no AS "requisitionNo",
+        mr.requisition_date AS "requisitionDate",
         mr.company,
-        mr."reqnType",
-        mr."requisitionFor",
+        mr.reqn_type AS "reqnType",
+        mr.requisition_for AS "requisitionFor",
         mr.buyer,
         mr.season,
-        mr."forLocation",
-        mr."preparedBy",
-        mr."deptFrom",
-        mr."deptTo",
-        mr."createdAt",
+        mr.for_location AS "forLocation",
+        mr.prepared_by AS "preparedBy",
+        mr.dept_from AS "deptFrom",
+        mr.dept_to AS "deptTo",
+        mr.created_at AS "createdAt",
         COALESCE(
           json_agg(
             json_build_object(
               'id', mi.id,
-              'itemCategory', mi."itemCategory",
-              'itemDesc', mi."itemDesc",
+              'itemCategory', mi.item_category,
+              'itemDesc', mi.item_desc,
               'color', mi.color,
               'width', mi.width,
               'unit', mi.unit,
-              'reqnQty', mi."reqnQty",
+              'reqnQty', mi.reqn_qty,
               'rate', mi.rate,
-              'reqOn', mi."reqOn",
+              'reqOn', mi.req_on,
               'remark', mi.remark
             )
           ) FILTER (WHERE mi.id IS NOT NULL),
           '[]'::json
         ) AS items
-      FROM public."MaterialRequisition" mr
-      LEFT JOIN public."MaterialReqItem" mi ON mi."requisitionId" = mr.id
-      WHERE (${location}::text IS NULL OR mr."forLocation" = ${location})
-        AND (${startDate}::timestamptz IS NULL OR mr."requisitionDate" >= ${startDate})
-        AND (${endDate}::timestamptz IS NULL OR mr."requisitionDate" <= ${endDate})
+      FROM public.material_requisitions mr
+      LEFT JOIN public.material_requisition_items mi ON mi.requisition_id = mr.id
+      WHERE (${location}::text IS NULL OR mr.for_location = ${location})
+        AND (${startDate}::timestamptz IS NULL OR mr.requisition_date >= ${startDate})
+        AND (${endDate}::timestamptz IS NULL OR mr.requisition_date <= ${endDate})
         AND (
           ${type}::text IS NULL
           OR EXISTS (
             SELECT 1
-            FROM public."MaterialReqItem" item_filter
-            WHERE item_filter."requisitionId" = mr.id
-              AND item_filter."itemCategory" ILIKE ${type}
+            FROM public.material_requisition_items item_filter
+            WHERE item_filter.requisition_id = mr.id
+              AND item_filter.item_category ILIKE ${type}
           )
         )
       GROUP BY mr.id
-      ORDER BY mr."createdAt" DESC
+      ORDER BY mr.created_at DESC
       LIMIT ${limit}
       OFFSET ${skip}
     `;
     const totalRows = await sql`
       SELECT COUNT(*)::int AS count
-      FROM public."MaterialRequisition" mr
-      WHERE (${location}::text IS NULL OR mr."forLocation" = ${location})
-        AND (${startDate}::timestamptz IS NULL OR mr."requisitionDate" >= ${startDate})
-        AND (${endDate}::timestamptz IS NULL OR mr."requisitionDate" <= ${endDate})
+      FROM public.material_requisitions mr
+      WHERE (${location}::text IS NULL OR mr.for_location = ${location})
+        AND (${startDate}::timestamptz IS NULL OR mr.requisition_date >= ${startDate})
+        AND (${endDate}::timestamptz IS NULL OR mr.requisition_date <= ${endDate})
         AND (
           ${type}::text IS NULL
           OR EXISTS (
             SELECT 1
-            FROM public."MaterialReqItem" item_filter
-            WHERE item_filter."requisitionId" = mr.id
-              AND item_filter."itemCategory" ILIKE ${type}
+            FROM public.material_requisition_items item_filter
+            WHERE item_filter.requisition_id = mr.id
+              AND item_filter.item_category ILIKE ${type}
           )
         )
     `;
     const total = Number(totalRows[0]?.count ?? 0);
 
     const pages = Math.ceil(total / limit);
-    return ok(requisitions, { total, page, pages });
+    return Response.json({ requisitions, data: requisitions, total, page, pages });
   } catch (error) {
     return serverError(error);
   }
@@ -110,6 +148,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    await ensureMaterialRequisitionTables();
+
     const body = await request.json() as unknown;
     const parsed = createMaterialRequisitionSchema.safeParse(body);
     
@@ -120,19 +160,19 @@ export async function POST(request: Request) {
     const data = parsed.data;
     const requisitionId = randomUUID();
     const rows = await sql`
-      INSERT INTO public."MaterialRequisition" (
-        id, "requisitionNo", "requisitionDate", company, "reqnType", "requisitionFor",
-        buyer, season, "forLocation", "preparedBy", "deptFrom", "deptTo", "createdAt"
+      INSERT INTO public.material_requisitions (
+        id, requisition_no, requisition_date, company, reqn_type, requisition_for,
+        buyer, season, for_location, prepared_by, dept_from, dept_to, created_at
       ) VALUES (
         ${requisitionId}, ${data.requisitionNo ?? null}, ${data.requisitionDate}, ${data.company}, ${data.reqnType}, ${data.requisitionFor},
         ${data.buyer ?? null}, ${data.season ?? null}, ${data.forLocation ?? null}, ${data.preparedBy ?? null}, ${data.deptFrom ?? null}, ${data.deptTo ?? null}, NOW()
       )
-      RETURNING id, "requisitionNo", "requisitionDate", "createdAt"
+      RETURNING id, requisition_no AS "requisitionNo", requisition_date AS "requisitionDate", created_at AS "createdAt"
     `;
     for (const item of data.items) {
       await sql`
-        INSERT INTO public."MaterialReqItem" (
-          id, "requisitionId", "itemCategory", "itemDesc", color, width, unit, "reqnQty", rate, "reqOn", remark
+        INSERT INTO public.material_requisition_items (
+          id, requisition_id, item_category, item_desc, color, width, unit, reqn_qty, rate, req_on, remark
         ) VALUES (
           ${randomUUID()}, ${requisitionId}, ${item.itemCategory}, ${item.itemDesc}, ${item.color ?? null}, ${item.width ?? null},
           ${item.unit ?? null}, ${item.reqnQty ?? null}, ${item.rate ?? null}, ${item.reqOn ?? null}, ${item.remark ?? null}

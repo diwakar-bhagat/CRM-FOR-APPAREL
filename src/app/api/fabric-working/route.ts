@@ -31,42 +31,23 @@ export async function GET(request: Request) {
     const orders = await sql`
       SELECT
         o.id,
-        o."orderNo",
-        o."styleDescription",
-        o.qty,
-        o."exFactoryDate",
-        o."pcdPlan",
-        json_build_object('name', b.name) AS buyer,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'balanceCuttingQty', pe."balanceCuttingQty",
-              'balanceStitchQty', pe."balanceStitchQty"
-            )
-            ORDER BY pe."entryDate" DESC
-          ) FILTER (WHERE pe.id IS NOT NULL),
-          '[]'::json
-        ) AS "productionEntries"
-      FROM public."Order" o
-      JOIN public."Buyer" b ON b.id = o."buyerId"
-      LEFT JOIN LATERAL (
-        SELECT id, "balanceCuttingQty", "balanceStitchQty", "entryDate"
-        FROM public."ProductionEntry"
-        WHERE "orderId" = o.id
-        ORDER BY "entryDate" DESC
-        LIMIT 1
-      ) pe ON true
-      WHERE (${buyer}::text IS NULL OR b.name ILIKE ${buyer})
-      GROUP BY o.id, b.name
-      ORDER BY o."createdAt" DESC
+        o.ref_no AS "orderNo",
+        o.style_name AS "styleDescription",
+        o.order_qty AS qty,
+        o.delivery_date AS "exFactoryDate",
+        NULL::timestamptz AS "pcdPlan",
+        json_build_object('name', o.buyer) AS buyer,
+        '[]'::json AS "productionEntries"
+      FROM public.orders o
+      WHERE (${buyer}::text IS NULL OR o.buyer ILIKE ${buyer})
+      ORDER BY o.delivery_date ASC NULLS LAST, o.ref_no ASC
       LIMIT ${limit}
       OFFSET ${skip}
     `;
     const totalRows = await sql`
       SELECT COUNT(*)::int AS count
-      FROM public."Order" o
-      JOIN public."Buyer" b ON b.id = o."buyerId"
-      WHERE (${buyer}::text IS NULL OR b.name ILIKE ${buyer})
+      FROM public.orders o
+      WHERE (${buyer}::text IS NULL OR o.buyer ILIKE ${buyer})
     `;
     const total = Number(totalRows[0]?.count ?? 0);
 

@@ -4,17 +4,28 @@ import { sql } from "@/lib/db";
 export async function GET() {
   try {
     const initialRdSopReport = await sql`
-      SELECT id, "orderNo", "styleDescription", "planStatus", qty, month
-      FROM public."Order"
-      WHERE "rdDate" IS NOT NULL
-      ORDER BY "rdDate" DESC
+      SELECT
+        id,
+        ref_no AS "orderNo",
+        style_name AS "styleDescription",
+        sop_status AS "planStatus",
+        order_qty AS qty,
+        TO_CHAR(delivery_date, 'YYYY-MM') AS month
+      FROM public.orders
+      ORDER BY delivery_date ASC NULLS LAST
       LIMIT 100
     `;
     const bulkEmbroideryOrder = await sql`
-      SELECT id, "orderNo", "styleDescription", "specialWork", "planStatus", qty, month
-      FROM public."Order"
-      WHERE "specialWork" ILIKE '%Emb.%'
-      ORDER BY "createdAt" DESC
+      SELECT
+        id,
+        ref_no AS "orderNo",
+        style_name AS "styleDescription",
+        NULL::text AS "specialWork",
+        ppm_status AS "planStatus",
+        order_qty AS qty,
+        TO_CHAR(delivery_date, 'YYYY-MM') AS month
+      FROM public.orders
+      ORDER BY updated_at DESC
       LIMIT 100
     `;
 

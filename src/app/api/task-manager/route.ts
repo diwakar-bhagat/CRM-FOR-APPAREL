@@ -26,53 +26,34 @@ export async function GET(request: Request) {
     const orders = await sql`
       SELECT
         o.id,
-        o."orderNo",
-        o."styleDescription",
-        o.qty,
-        o.month,
-        o."planStatus",
-        o."exFactoryDate",
-        o."fileHoDate",
-        o."pcdPlan",
-        o."finalPcdClosure",
-        o."rdDate",
-        o."ppComments",
-        o."specialWork",
-        o.fob,
-        json_build_object('name', b.name) AS buyer,
-        COALESCE(pe.items, '[]'::json) AS "productionEntries",
-        COALESCE(te.items, '[]'::json) AS "trimStatus"
-      FROM public."Order" o
-      JOIN public."Buyer" b ON b.id = o."buyerId"
-      LEFT JOIN LATERAL (
-        SELECT json_agg(json_build_object(
-          'id', id,
-          'balanceStitchQty', "balanceStitchQty",
-          'balanceSpecialWork', "balanceSpecialWork"
-        )) AS items
-        FROM public."ProductionEntry"
-        WHERE "orderId" = o.id
-      ) pe ON true
-      LEFT JOIN LATERAL (
-        SELECT json_agg(json_build_object(
-          'id', id,
-          'trimStatus', "trimStatus"
-        )) AS items
-        FROM public."TrimEntry"
-        WHERE "orderId" = o.id
-      ) te ON true
-      WHERE (${buyer}::text IS NULL OR b.name = ${buyer})
-        AND (${exFactoryDate}::timestamptz IS NULL OR o."exFactoryDate" = ${exFactoryDate})
-      ORDER BY o."exFactoryDate" ASC
+        o.ref_no AS "orderNo",
+        o.style_name AS "styleDescription",
+        o.order_qty AS qty,
+        TO_CHAR(o.delivery_date, 'YYYY-MM') AS month,
+        COALESCE(o.pfh_status, 'Pending') AS "planStatus",
+        o.delivery_date AS "exFactoryDate",
+        NULL::timestamptz AS "fileHoDate",
+        NULL::timestamptz AS "pcdPlan",
+        NULL::timestamptz AS "finalPcdClosure",
+        NULL::timestamptz AS "rdDate",
+        NULL::text AS "ppComments",
+        NULL::text AS "specialWork",
+        NULL::numeric AS fob,
+        json_build_object('name', o.buyer) AS buyer,
+        '[]'::json AS "productionEntries",
+        '[]'::json AS "trimStatus"
+      FROM public.orders o
+      WHERE (${buyer}::text IS NULL OR o.buyer = ${buyer})
+        AND (${exFactoryDate}::timestamptz IS NULL OR o.delivery_date = ${exFactoryDate})
+      ORDER BY o.delivery_date ASC NULLS LAST, o.ref_no ASC
       LIMIT ${limit}
       OFFSET ${skip}
     `;
     const totalRows = await sql`
       SELECT COUNT(*)::int AS count
-      FROM public."Order" o
-      JOIN public."Buyer" b ON b.id = o."buyerId"
-      WHERE (${buyer}::text IS NULL OR b.name = ${buyer})
-        AND (${exFactoryDate}::timestamptz IS NULL OR o."exFactoryDate" = ${exFactoryDate})
+      FROM public.orders o
+      WHERE (${buyer}::text IS NULL OR o.buyer = ${buyer})
+        AND (${exFactoryDate}::timestamptz IS NULL OR o.delivery_date = ${exFactoryDate})
     `;
     const total = Number(totalRows[0]?.count ?? 0);
 
@@ -104,7 +85,7 @@ export async function GET(request: Request) {
     }));
 
     const pages = Math.ceil(total / limit);
-    return ok(enrichedOrders, { total, page, pages });
+    return Response.json({ orders: enrichedOrders, data: enrichedOrders, total, page, pages });
   } catch (error) {
     return serverError(error);
   }
