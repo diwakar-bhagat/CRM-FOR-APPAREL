@@ -121,8 +121,10 @@ export async function POST(request: Request) {
     }
 
     // 4. Invalidate and Update Redis Cache
-    await redis.del(CACHE_KEYS.PRIORITY_LIST);
-    await redis.set(CACHE_KEYS.SYNC_LAST_RUN, new Date().toISOString());
+    if (redis) {
+      await redis.del(CACHE_KEYS.PRIORITY_LIST);
+      await redis.set(CACHE_KEYS.SYNC_LAST_RUN, new Date().toISOString());
+    }
 
     return NextResponse.json(
       {

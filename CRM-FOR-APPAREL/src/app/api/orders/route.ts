@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       : CACHE_KEYS.ORDERS_LIST;
 
     // 1. Cache-aside: try Redis first
-    const cached = await redis.get<{ orders: Order[]; count: number; cached: boolean }>(cacheKey);
+    const cached = redis ? await redis.get<{ orders: Order[]; count: number; cached: boolean }>(cacheKey) : null;
     if (cached) {
       return NextResponse.json({ ...cached, cached: true });
     }
@@ -37,7 +37,9 @@ export async function GET(request: Request) {
     const payload = { orders: rows as Order[], count: rows.length, cached: false };
 
     // 3. Populate cache asynchronously (non-blocking)
-    redis.set(cacheKey, JSON.stringify(payload), { ex: CACHE_TTL }).catch(console.error);
+    if (redis) {
+      redis.set(cacheKey, JSON.stringify(payload), { ex: CACHE_TTL }).catch(console.error);
+    }
 
     return NextResponse.json(payload);
   } catch (error) {
@@ -95,7 +97,9 @@ export async function POST(req: Request) {
       }
 
       // Invalidate orders list cache so the next GET fetches fresh data
-      redis.del(CACHE_KEYS.ORDERS_LIST).catch(console.error);
+      if (redis) {
+        redis.del(CACHE_KEYS.ORDERS_LIST).catch(console.error);
+      }
     }
 
     return NextResponse.json({ success: true, order: res[0] });

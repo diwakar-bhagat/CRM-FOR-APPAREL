@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     // 1. Try Cache First (Fast Read Path)
     const cacheKey = severityFilter ? CACHE_KEYS.PRIORITY_FILTERED(severityFilter) : CACHE_KEYS.PRIORITY_LIST;
 
-    const cachedData = await redis.get<CommandCenterResponse>(cacheKey);
+    const cachedData = redis ? await redis.get<CommandCenterResponse>(cacheKey) : null;
 
     if (cachedData) {
       return NextResponse.json({
@@ -69,7 +69,9 @@ export async function GET(request: Request) {
 
     // 3. Store in Redis asynchronously
     // Background cache write (non-blocking)
-    redis.set(cacheKey, JSON.stringify(responseData), { ex: CACHE_TTL }).catch(console.error);
+    if (redis) {
+      redis.set(cacheKey, JSON.stringify(responseData), { ex: CACHE_TTL }).catch(console.error);
+    }
 
     return NextResponse.json(responseData);
   } catch (error) {

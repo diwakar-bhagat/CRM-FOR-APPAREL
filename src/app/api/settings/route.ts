@@ -13,7 +13,7 @@ import type { GlobalConfig } from "@/types/app";
 export async function GET() {
   try {
     // 1. Try Redis cache first
-    const cached = await redis.get<GlobalConfig>(CACHE_KEYS.GLOBAL_SETTINGS);
+    const cached = redis ? await redis.get<GlobalConfig>(CACHE_KEYS.GLOBAL_SETTINGS) : null;
     if (cached) {
       return NextResponse.json({ settings: cached, cached: true });
     }
@@ -31,11 +31,13 @@ export async function GET() {
     const settings = config as unknown as GlobalConfig;
 
     // 3. Populate Redis cache
-    await redis
-      .set(CACHE_KEYS.GLOBAL_SETTINGS, JSON.stringify(settings), {
-        ex: SETTINGS_CACHE_TTL,
-      })
-      .catch(console.error);
+    if (redis) {
+      await redis
+        .set(CACHE_KEYS.GLOBAL_SETTINGS, JSON.stringify(settings), {
+          ex: SETTINGS_CACHE_TTL,
+        })
+        .catch(console.error);
+    }
 
     return NextResponse.json({ settings, cached: false });
   } catch (error) {
@@ -84,7 +86,9 @@ export async function PATCH(request: Request) {
     }
 
     // Invalidate Redis cache so next GET fetches fresh data
-    await redis.del(CACHE_KEYS.GLOBAL_SETTINGS).catch(console.error);
+    if (redis) {
+      await redis.del(CACHE_KEYS.GLOBAL_SETTINGS).catch(console.error);
+    }
 
     return NextResponse.json({
       success: true,
