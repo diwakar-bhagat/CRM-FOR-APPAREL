@@ -1,59 +1,40 @@
 import Redis from "ioredis";
 
-type RedisSetOptions = {
-  ex?: number;
+const globalForRedis = globalThis as unknown as {
+  redis: Redis | undefined;
 };
 
-type CacheClient = {
-  get: <T>(key: string) => Promise<T | null>;
-  set: (key: string, value: string, options?: RedisSetOptions) => Promise<"OK" | null>;
-  del: (key: string) => Promise<number>;
-  incr: (key: string) => Promise<number>;
-  expire: (key: string, seconds: number) => Promise<number>;
-};
-
-const parseCachedValue = <T>(value: string | null): T | null => {
-  if (value === null) return null;
-
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return value as T;
-  }
-};
-
-const createRedisClient = (): CacheClient => {
+function createRedisClient() {
   if (!process.env.REDIS_URL) {
-    return {
-      get: async () => null,
-      set: async () => "OK",
-      del: async () => 1,
-      incr: async () => 1,
-      expire: async () => 1,
-    };
+    console.warn("[Redis] REDIS_URL not set — cache disabled");
+    return null;
   }
 
   const client = new Redis(process.env.REDIS_URL, {
-    lazyConnect: true,
-    maxRetriesPerRequest: 2,
+    maxRetriesPerRequest: 3,
+    retryStrategy(times) {
+      if (times > 3) return null;
+      return Math.min(times * 200, 1000);
+    },
+    enableOfflineQueue: false,
   });
 
-  return {
-    get: async <T>(key: string) => parseCachedValue<T>(await client.get(key)),
-    set: async (key, value, options) => {
-      if (options?.ex) {
-        return client.set(key, value, "EX", options.ex);
-      }
+  client.on("error", (err) => {
+    console.error("[Redis] Error:", err.message);
+  });
 
-      return client.set(key, value);
-    },
-    del: (key) => client.del(key),
-    incr: (key) => client.incr(key),
-    expire: (key, seconds) => client.expire(key, seconds),
-  };
-};
+  client.on("connect", () => {
+    console.log("[Redis] Connected");
+  });
 
-export const redis = createRedisClient();
+  return client;
+}
+
+export const redis = globalForRedis.redis ?? createRedisClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForRedis.redis = redis ?? undefined;
+}
 
 export const CACHE_KEYS = {
   PRIORITY_LIST: "priority:list:all",
