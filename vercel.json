@@ -1,7 +1,8 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "pnpm build",
   "outputDirectory": ".next",
-  "installCommand": "npm ci",
+  "installCommand": "pnpm install",
+  "packageManager": "pnpm@10.x",
   "framework": "nextjs",
   "regions": ["sin1"]
 }
