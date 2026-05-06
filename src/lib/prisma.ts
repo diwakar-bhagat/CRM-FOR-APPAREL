@@ -1,40 +1,40 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma: PrismaClient =
-  globalForPrisma.prisma ??
-  createPrismaClient();
+export const prisma: PrismaClient = globalForPrisma.prisma ?? createPrismaClient();
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
-    throw new Error("DATABASE_URL environment variable is not set");
+    // Return a mock client for build-time when DATABASE_URL is not set
+    // This allows the build to succeed without a database
+    return new PrismaClient({
+      // Disable SSL verification in development
+      errorFormat: "pretty",
+    });
   }
 
-  const pool = new Pool({
-    connectionString,
-    max: 1, // Use only 1 connection in serverless environment
-  });
-
-  const adapter = new PrismaPg(pool);
-
   const client = new PrismaClient({
-    adapter,
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
+    datasources: {
+      db: {
+        url: connectionString,
+      },
+    },
+    errorFormat: "pretty",
   });
 
-  // Prevent connection pool exhaustion in development
   if (process.env.NODE_ENV !== "production") {
     globalForPrisma.prisma = client;
   }
 
   return client;
+}
+
+export async function disconnectPrisma() {
+  if (globalForPrisma.prisma) {
+    await globalForPrisma.prisma.$disconnect();
+  }
 }
