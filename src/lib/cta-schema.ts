@@ -1,6 +1,30 @@
 import { sql } from "@/lib/db";
 
+export async function ensureOrdersTable() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.orders (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      ref_no TEXT UNIQUE NOT NULL,
+      buyer TEXT,
+      brand TEXT,
+      style_id TEXT,
+      style_name TEXT,
+      order_qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+      delivery_date TIMESTAMPTZ,
+      pfh_status TEXT NOT NULL DEFAULT 'PENDING',
+      sop_status TEXT NOT NULL DEFAULT 'PENDING',
+      ppm_status TEXT NOT NULL DEFAULT 'PENDING',
+      approval_pending BOOLEAN NOT NULL DEFAULT false,
+      vendor_last_active TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+}
+
 export async function ensureOrderProcessTable() {
+  await ensureOrdersTable();
+
   await sql`
     CREATE TABLE IF NOT EXISTS public.order_processes (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -31,6 +55,8 @@ export async function ensureOrderProcessTable() {
 }
 
 export async function ensureSampleTrackingTables() {
+  await ensureOrdersTable();
+
   await sql`
     CREATE TABLE IF NOT EXISTS public.sample_requests (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -64,6 +90,8 @@ export async function ensureSampleTrackingTables() {
 }
 
 export async function ensureDesignVaultTable() {
+  await ensureOrdersTable();
+
   await sql`
     CREATE TABLE IF NOT EXISTS public.design_vault_items (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -86,6 +114,8 @@ export async function ensureDesignVaultTable() {
 }
 
 export async function ensureDrEntriesTable() {
+  await ensureOrdersTable();
+
   await sql`
     CREATE TABLE IF NOT EXISTS public.dr_entries (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -140,6 +170,8 @@ export async function ensureDrEntriesTable() {
 }
 
 export async function ensureNotificationsTable() {
+  await ensureOrdersTable();
+
   await sql`
     CREATE TABLE IF NOT EXISTS public.notifications (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

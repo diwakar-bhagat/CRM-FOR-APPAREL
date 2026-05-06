@@ -1,9 +1,12 @@
 import { paginationQuerySchema } from "@/lib/erp-api";
 import { ok, serverError, validationError } from "@/lib/api-response";
+import { ensureOrdersTable } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 
 export async function GET(request: Request) {
   try {
+    await ensureOrdersTable();
+
     const url = new URL(request.url);
     const params = url.searchParams;
     const distinct = params.get("distinct");
@@ -116,6 +119,8 @@ export async function GET(request: Request) {
 
 export async function POST(req: Request) {
   try {
+    await ensureOrdersTable();
+
     const data = await req.json() as any;
     const rows = await sql`
       INSERT INTO public.orders (
