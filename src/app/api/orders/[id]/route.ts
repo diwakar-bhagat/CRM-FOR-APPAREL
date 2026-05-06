@@ -1,8 +1,11 @@
 import { notFound, serverError } from '@/lib/api-response';
+import { ensureOrdersTable } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    await ensureOrdersTable();
+
     const { id } = await params;
     const rows = await sql`
       SELECT
@@ -51,6 +54,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    await ensureOrdersTable();
+
     const { id } = await params;
     const data = await request.json() as any;
     const rows = await sql`

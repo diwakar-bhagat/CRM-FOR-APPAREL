@@ -1,8 +1,11 @@
 import { ok, serverError } from '@/lib/api-response';
+import { ensureOrdersTable } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 
 export async function GET() {
   try {
+    await ensureOrdersTable();
+
     const labDipStrikeOff = await sql`
       SELECT
         id,

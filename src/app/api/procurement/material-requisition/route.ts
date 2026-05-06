@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ok, created, serverError, validationError } from '@/lib/api-response';
 import { createMaterialRequisitionSchema, paginationQuerySchema } from "@/lib/erp-api";
+import { ensureMaterialRequisitionTables } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 import { randomUUID } from "node:crypto";
 
@@ -9,42 +10,6 @@ const getMaterialRequisitionSchema = paginationQuerySchema.extend({
   location: z.string().optional(),
   year: z.string().optional(),
 });
-
-async function ensureMaterialRequisitionTables() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS public.material_requisitions (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      requisition_no TEXT,
-      requisition_date TIMESTAMPTZ NOT NULL,
-      company TEXT NOT NULL DEFAULT 'CTA APPARELS PVT. LTD.',
-      reqn_type TEXT NOT NULL,
-      requisition_for TEXT NOT NULL,
-      buyer TEXT,
-      season TEXT,
-      for_location TEXT,
-      prepared_by TEXT,
-      dept_from TEXT,
-      dept_to TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS public.material_requisition_items (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      requisition_id UUID NOT NULL REFERENCES public.material_requisitions(id) ON DELETE CASCADE,
-      item_category TEXT NOT NULL,
-      item_desc TEXT NOT NULL,
-      color TEXT,
-      width TEXT,
-      unit TEXT,
-      reqn_qty NUMERIC,
-      rate NUMERIC,
-      req_on TIMESTAMPTZ,
-      remark TEXT
-    )
-  `;
-}
 
 export async function GET(request: Request) {
   try {
@@ -75,6 +40,7 @@ export async function GET(request: Request) {
         mr.id,
         mr.requisition_no AS "requisitionNo",
         mr.requisition_date AS "requisitionDate",
+        mr.item_type AS "itemType",
         mr.company,
         mr.reqn_type AS "reqnType",
         mr.requisition_for AS "requisitionFor",
@@ -84,6 +50,7 @@ export async function GET(request: Request) {
         mr.prepared_by AS "preparedBy",
         mr.dept_from AS "deptFrom",
         mr.dept_to AS "deptTo",
+        mr.status,
         mr.created_at AS "createdAt",
         COALESCE(
           json_agg(
@@ -161,10 +128,10 @@ export async function POST(request: Request) {
     const requisitionId = randomUUID();
     const rows = await sql`
       INSERT INTO public.material_requisitions (
-        id, requisition_no, requisition_date, company, reqn_type, requisition_for,
+        id, requisition_no, requisition_date, item_type, company, reqn_type, requisition_for,
         buyer, season, for_location, prepared_by, dept_from, dept_to, created_at
       ) VALUES (
-        ${requisitionId}, ${data.requisitionNo ?? null}, ${data.requisitionDate}, ${data.company}, ${data.reqnType}, ${data.requisitionFor},
+        ${requisitionId}, ${data.requisitionNo ?? null}, ${data.requisitionDate}, ${data.items[0]?.itemCategory ?? 'FABRIC'}, ${data.company}, ${data.reqnType}, ${data.requisitionFor},
         ${data.buyer ?? null}, ${data.season ?? null}, ${data.forLocation ?? null}, ${data.preparedBy ?? null}, ${data.deptFrom ?? null}, ${data.deptTo ?? null}, NOW()
       )
       RETURNING id, requisition_no AS "requisitionNo", requisition_date AS "requisitionDate", created_at AS "createdAt"

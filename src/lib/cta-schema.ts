@@ -20,6 +20,23 @@ export async function ensureOrdersTable() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+
+  await sql`
+    ALTER TABLE public.orders
+      ADD COLUMN IF NOT EXISTS buyer TEXT,
+      ADD COLUMN IF NOT EXISTS brand TEXT,
+      ADD COLUMN IF NOT EXISTS style_id TEXT,
+      ADD COLUMN IF NOT EXISTS style_name TEXT,
+      ADD COLUMN IF NOT EXISTS order_qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS delivery_date TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS pfh_status TEXT NOT NULL DEFAULT 'PENDING',
+      ADD COLUMN IF NOT EXISTS sop_status TEXT NOT NULL DEFAULT 'PENDING',
+      ADD COLUMN IF NOT EXISTS ppm_status TEXT NOT NULL DEFAULT 'PENDING',
+      ADD COLUMN IF NOT EXISTS approval_pending BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS vendor_last_active TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `;
 }
 
 export async function ensureOrderProcessTable() {
@@ -204,5 +221,151 @@ export async function ensureNotificationsTable() {
     WHERE approval_pending = true OR delivery_date <= NOW() + INTERVAL '14 days'
     ORDER BY delivery_date ASC NULLS LAST
     LIMIT 25
+  `;
+}
+
+export async function ensureMaterialRequisitionTables() {
+  await ensureOrdersTable();
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.material_requisitions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      requisition_no TEXT UNIQUE,
+      requisition_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      item_type TEXT NOT NULL DEFAULT 'FABRIC',
+      company TEXT NOT NULL DEFAULT 'CTA APPARELS PVT. LTD.',
+      reqn_type TEXT NOT NULL DEFAULT 'LOCAL',
+      requisition_for TEXT NOT NULL DEFAULT 'Sample',
+      buyer TEXT,
+      season TEXT,
+      for_location TEXT,
+      prepared_by TEXT,
+      dept_from TEXT,
+      dept_to TEXT,
+      order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    ALTER TABLE public.material_requisitions
+      ADD COLUMN IF NOT EXISTS requisition_no TEXT,
+      ADD COLUMN IF NOT EXISTS requisition_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'FABRIC',
+      ADD COLUMN IF NOT EXISTS company TEXT NOT NULL DEFAULT 'CTA APPARELS PVT. LTD.',
+      ADD COLUMN IF NOT EXISTS reqn_type TEXT NOT NULL DEFAULT 'LOCAL',
+      ADD COLUMN IF NOT EXISTS requisition_for TEXT NOT NULL DEFAULT 'Sample',
+      ADD COLUMN IF NOT EXISTS buyer TEXT,
+      ADD COLUMN IF NOT EXISTS season TEXT,
+      ADD COLUMN IF NOT EXISTS for_location TEXT,
+      ADD COLUMN IF NOT EXISTS prepared_by TEXT,
+      ADD COLUMN IF NOT EXISTS dept_from TEXT,
+      ADD COLUMN IF NOT EXISTS dept_to TEXT,
+      ADD COLUMN IF NOT EXISTS order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'DRAFT',
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.material_requisition_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      requisition_id UUID NOT NULL REFERENCES public.material_requisitions(id) ON DELETE CASCADE,
+      item_category TEXT NOT NULL,
+      item_desc TEXT NOT NULL,
+      color TEXT,
+      width TEXT,
+      unit TEXT,
+      reqn_qty NUMERIC,
+      rate NUMERIC,
+      req_on TIMESTAMPTZ,
+      remark TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+}
+
+export async function ensureFabricReportsTable() {
+  await ensureOrdersTable();
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.fabric_reports (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      our_ref TEXT UNIQUE NOT NULL,
+      order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
+      order_no TEXT NOT NULL,
+      po_no TEXT,
+      user_created TEXT,
+      order_qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+      qty_unit TEXT NOT NULL DEFAULT 'PCS',
+      style_no TEXT,
+      order_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      pdf_url TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+}
+
+export async function ensureDispatchChallanTables() {
+  await ensureOrdersTable();
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.dispatch_challans (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      challan_no TEXT UNIQUE NOT NULL,
+      order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
+      dispatch_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      from_location TEXT NOT NULL,
+      to_location TEXT NOT NULL,
+      prepared_by TEXT,
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.dispatch_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      challan_id UUID NOT NULL REFERENCES public.dispatch_challans(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+      unit TEXT NOT NULL DEFAULT 'PCS',
+      remark TEXT
+    )
+  `;
+}
+
+export async function ensurePriorityTables() {
+  await ensureOrdersTable();
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.derived_signals (
+      order_id UUID PRIMARY KEY REFERENCES public.orders(id) ON DELETE CASCADE,
+      is_delayed BOOLEAN NOT NULL DEFAULT false,
+      delay_days INTEGER NOT NULL DEFAULT 0,
+      is_blocked BOOLEAN NOT NULL DEFAULT false,
+      blocked_reason TEXT,
+      inactivity_hours NUMERIC,
+      cascade_risk BOOLEAN NOT NULL DEFAULT false,
+      cascade_reason TEXT,
+      deadline_proximity TEXT,
+      computed_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.priority_scores (
+      order_id UUID PRIMARY KEY REFERENCES public.orders(id) ON DELETE CASCADE,
+      score NUMERIC NOT NULL DEFAULT 0,
+      severity TEXT NOT NULL DEFAULT 'low',
+      reason_codes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      recommended_action TEXT,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
   `;
 }

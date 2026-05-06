@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ok, serverError, validationError } from '@/lib/api-response';
+import { ensureOrdersTable } from '@/lib/cta-schema';
 import { parsePagination } from '@/lib/parse-utils';
 import { sql } from '@/lib/db';
 
@@ -12,6 +13,8 @@ const getFabricWorkingSchema = z.object({
 
 export async function GET(request: Request) {
   try {
+    await ensureOrdersTable();
+
     const url = new URL(request.url);
     const params = {
       status: url.searchParams.get('status') ?? 'All Items',

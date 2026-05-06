@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ok, serverError, validationError } from '@/lib/api-response';
+import { ensureOrdersTable } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 import { safeInt } from '@/lib/parse-utils';
 
@@ -9,6 +10,8 @@ const getAnalyticsSchema = z.object({
 
 export async function GET(request: Request) {
   try {
+    await ensureOrdersTable();
+
     const url = new URL(request.url);
     const params = {
       year: url.searchParams.get("year"),

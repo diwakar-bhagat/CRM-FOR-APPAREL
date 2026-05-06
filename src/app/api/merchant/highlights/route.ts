@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { ensureOrdersTable } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 
 export async function GET() {
@@ -8,6 +9,20 @@ export async function GET() {
   }
 
   try {
+    await ensureOrdersTable();
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.lab_dips (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        order_id UUID REFERENCES public.orders(id) ON DELETE CASCADE,
+        action_status TEXT DEFAULT 'pending',
+        sent_date TIMESTAMPTZ,
+        sent_by TEXT,
+        deadline_margin TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
     // 1. Fetch Production File Handover (recently completed pfh_status)
     const pfhRows = await sql`
       SELECT id as "orderId", ref_no as "refNo", buyer, brand, style_id as "styleId", style_name as "styleName", pfh_status as "status"
@@ -21,9 +36,8 @@ export async function GET() {
     const riskRows = await sql`
       SELECT o.id as "orderId", o.ref_no as "refNo", o.buyer, o.brand, o.style_id as "styleId", o.style_name as "styleName"
       FROM public.orders o
-      JOIN public.priority_scores ps ON o.id = ps.order_id
-      WHERE ps.severity IN ('critical', 'high')
-      ORDER BY ps.score DESC
+      WHERE o.delivery_date < NOW() OR o.approval_pending = true
+      ORDER BY o.delivery_date ASC NULLS LAST
       LIMIT 10
     `;
 

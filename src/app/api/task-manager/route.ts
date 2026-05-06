@@ -1,10 +1,13 @@
 import { ok, serverError, validationError } from '@/lib/api-response';
 import { paginationQuerySchema } from "@/lib/erp-api";
+import { ensureOrdersTable } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 import { isValidDate } from '@/lib/parse-utils';
 
 export async function GET(request: Request) {
   try {
+    await ensureOrdersTable();
+
     const url = new URL(request.url);
     const params = url.searchParams;
     const buyer = params.get("buyer");

@@ -1,8 +1,11 @@
 import { ok, serverError } from '@/lib/api-response';
+import { ensureOrdersTable } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 
 export async function GET() {
   try {
+    await ensureOrdersTable();
+
     const productionFileHandover = await sql`
       SELECT o.ref_no AS "orderNo", o.style_name AS "styleDescription", o.buyer AS "buyerName"
       FROM public.orders o

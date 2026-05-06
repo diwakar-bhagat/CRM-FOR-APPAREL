@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { ensureOrdersTable } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 
 const patchSchema = z
@@ -20,6 +21,8 @@ export async function GET() {
   }
 
   try {
+    await ensureOrdersTable();
+
     const rows = await sql`
       SELECT 
         o.id,
@@ -51,6 +54,8 @@ export async function PATCH(request: Request) {
   }
 
   try {
+    await ensureOrdersTable();
+
     let rawBody: unknown;
     try {
       rawBody = await request.json();

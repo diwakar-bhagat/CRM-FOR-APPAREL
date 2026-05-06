@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { ensurePriorityTables } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 import { computeDerivedSignals, computePriorityScore } from "@/lib/priority-engine";
 import { CACHE_KEYS, redis } from "@/lib/redis";
@@ -20,6 +21,8 @@ function getRequesterId(request: Request): string {
 
 export async function POST(request: Request) {
   try {
+    await ensurePriorityTables();
+
     const requesterId = getRequesterId(request);
     const windowBucket = Math.floor(Date.now() / 1000 / SYNC_RATE_LIMIT_WINDOW_SECONDS);
     const rateLimitKey = `rate_limit:erp_sync:{${requesterId}}:${windowBucket}`;

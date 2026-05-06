@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { ensurePriorityTables } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 import { CACHE_KEYS, CACHE_TTL, redis } from "@/lib/redis";
 import type { CommandCenterResponse, PriorityItem } from "@/types/erp";
 
 export async function GET(request: Request) {
   try {
+    await ensurePriorityTables();
+
     const url = new URL(request.url);
     const severityFilter = url.searchParams.get("severity");
 
