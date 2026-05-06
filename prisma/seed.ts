@@ -1,7 +1,7 @@
-import path from "node:path";
-
-import { PrismaClient } from "@prisma/client";
 import * as XLSX from "xlsx";
+
+import { PrismaClient } from "../generated/prisma";
+import path from "node:path";
 
 const prisma = new PrismaClient();
 
@@ -93,14 +93,17 @@ async function seedMonthlyOrderSheet(workbook: XLSX.WorkBook, sheetName: string)
         orderNo: rawOrderNo,
         styleDescription: safeString(row[headers.indexOf("Style Description")]) ?? rawOrderNo,
         specialWork: safeString(row[headers.indexOf("Special Work")]),
-        sam: parseFloatOrUndefined(row[headers.indexOf("SAM")]) ?? parseFloatOrUndefined(row[headers.indexOf("Unnamed: 4")]),
+        sam:
+          parseFloatOrUndefined(row[headers.indexOf("SAM")]) ??
+          parseFloatOrUndefined(row[headers.indexOf("Unnamed: 4")]),
         totalQty: parseIntOrUndefined(row[headers.indexOf("Total Qty.")]),
         qty: parseIntOrUndefined(row[headers.indexOf("Qty.")]) ?? 0,
         buyerId: buyer.id,
         unitId: unit.id,
         fabricSupplier: safeString(row[headers.indexOf("Fabric Supplier")]),
         fabricInhDate: parseDate(row[headers.indexOf("Fabric I/H Date")]),
-        exFactoryDate: parseDate(row[headers.indexOf("Ex-Factory")]) ?? parseDate(row[headers.indexOf("Ex-Factory Start Date")]),
+        exFactoryDate:
+          parseDate(row[headers.indexOf("Ex-Factory")]) ?? parseDate(row[headers.indexOf("Ex-Factory Start Date")]),
         revisedExFactory: parseDate(row[headers.indexOf("Rivised Ex-Factory")]),
         pcdPlan: parseDate(row[headers.indexOf("PCD Plan")]) ?? parseDate(row[headers.indexOf("PCD Plan Date")]),
         fileHoDate: parseDate(row[headers.indexOf("File H/O Date")]),
@@ -116,14 +119,17 @@ async function seedMonthlyOrderSheet(workbook: XLSX.WorkBook, sheetName: string)
       update: {
         styleDescription: safeString(row[headers.indexOf("Style Description")]) ?? rawOrderNo,
         specialWork: safeString(row[headers.indexOf("Special Work")]),
-        sam: parseFloatOrUndefined(row[headers.indexOf("SAM")]) ?? parseFloatOrUndefined(row[headers.indexOf("Unnamed: 4")]),
+        sam:
+          parseFloatOrUndefined(row[headers.indexOf("SAM")]) ??
+          parseFloatOrUndefined(row[headers.indexOf("Unnamed: 4")]),
         totalQty: parseIntOrUndefined(row[headers.indexOf("Total Qty.")]),
         qty: parseIntOrUndefined(row[headers.indexOf("Qty.")]) ?? 0,
         buyerId: buyer.id,
         unitId: unit.id,
         fabricSupplier: safeString(row[headers.indexOf("Fabric Supplier")]),
         fabricInhDate: parseDate(row[headers.indexOf("Fabric I/H Date")]),
-        exFactoryDate: parseDate(row[headers.indexOf("Ex-Factory")]) ?? parseDate(row[headers.indexOf("Ex-Factory Start Date")]),
+        exFactoryDate:
+          parseDate(row[headers.indexOf("Ex-Factory")]) ?? parseDate(row[headers.indexOf("Ex-Factory Start Date")]),
         revisedExFactory: parseDate(row[headers.indexOf("Rivised Ex-Factory")]),
         pcdPlan: parseDate(row[headers.indexOf("PCD Plan")]) ?? parseDate(row[headers.indexOf("PCD Plan Date")]),
         fileHoDate: parseDate(row[headers.indexOf("File H/O Date")]),
@@ -229,63 +235,57 @@ async function seedMasterSheet(workbook: XLSX.WorkBook, sheetName: string) {
 }
 
 async function seedDefaultData() {
-  console.log('📝 Seeding default test data...');
-  
+  console.log("📝 Seeding default test data...");
+
   // Seed buyers
   const buyers = await Promise.all(
-    ['H&M', 'ZARA', 'Pull & Bear', 'Street One', 'Bestseller', 'ECI', 'AEO', 'George'].map(name =>
-      upsertBuyer(name)
-    )
+    ["H&M", "ZARA", "Pull & Bear", "Street One", "Bestseller", "ECI", "AEO", "George"].map((name) => upsertBuyer(name)),
   );
-  
+
   // Seed units
-  const units = await Promise.all(
-    ['D-235', 'C-32', 'A-12', 'PLK'].map(name =>
-      upsertUnit(name)
-    )
-  );
+  const units = await Promise.all(["D-235", "C-32", "A-12", "PLK"].map((name) => upsertUnit(name)));
 
   // Seed sample orders
   for (let i = 0; i < 5; i++) {
     const buyer = buyers[i % buyers.length];
     const unit = units[i % units.length];
-    
+
     const orderDate = new Date();
     orderDate.setMonth(orderDate.getMonth() - (i % 3));
-    
+
     await prisma.order.upsert({
       where: { orderNo: `ORDER-${Date.now()}-${i}` },
       create: {
         orderNo: `ORDER-${Date.now()}-${i}`,
         styleDescription: `Sample Style ${i + 1}`,
-        specialWork: i % 2 === 0 ? 'Emb.' : undefined,
+        specialWork: i % 2 === 0 ? "Emb." : undefined,
         sam: 15 + i * 2,
         totalQty: 1000 + i * 100,
         qty: 1000 + i * 100,
         buyerId: buyer.id,
         unitId: unit.id,
-        fabricSupplier: 'Default Supplier',
+        fabricSupplier: "Default Supplier",
         exFactoryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         pcdPlan: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
-        planStatus: 'Planned',
-        month: `${['Jan', 'Feb', 'Mar', 'Apr', 'May'][i % 5]}-26`,
+        planStatus: "Planned",
+        month: `${["Jan", "Feb", "Mar", "Apr", "May"][i % 5]}-26`,
       },
       update: {},
     });
   }
 
-  console.log('✓ Default data seeded');
+  console.log("✓ Default data seeded");
 }
 
 async function main() {
   try {
-    console.log('🌱 Starting database seed...');
-    
+    console.log("🌱 Starting database seed...");
+
     const workbookPath = path.join(process.cwd(), "Combined_Order_Sheet_D-235.xlsx");
-    const fs = await import('fs');
-    
+    const fs = await import("fs");
+
     if (fs.existsSync(workbookPath)) {
-      console.log('📂 Excel file found, importing data...');
+      console.log("📂 Excel file found, importing data...");
       const workbook = XLSX.readFile(workbookPath);
 
       const sheetNames = workbook.SheetNames;
@@ -303,13 +303,13 @@ async function main() {
         await seedMasterSheet(workbook, "Master Sheet");
       }
     } else {
-      console.log('⚠️  Excel file not found, seeding with default data...');
+      console.log("⚠️  Excel file not found, seeding with default data...");
       await seedDefaultData();
     }
 
-    console.log('✅ Seeding complete!');
+    console.log("✅ Seeding complete!");
   } catch (error) {
-    console.error('❌ Seed error:', error);
+    console.error("❌ Seed error:", error);
     throw error;
   }
 }

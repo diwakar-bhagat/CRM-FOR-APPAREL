@@ -1,10 +1,49 @@
 import Redis from "ioredis";
 
+/** Thin wrapper that exposes an Upstash-compatible API over ioredis. */
+class RedisWrapper {
+  private client: Redis;
+
+  constructor(client: Redis) {
+    this.client = client;
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    const value = await this.client.get(key);
+    if (value === null) return null;
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return value as unknown as T;
+    }
+  }
+
+  async set(key: string, value: string, options?: { ex?: number }): Promise<void> {
+    if (options?.ex) {
+      await this.client.set(key, value, "EX", options.ex);
+    } else {
+      await this.client.set(key, value);
+    }
+  }
+
+  async del(key: string): Promise<void> {
+    await this.client.del(key);
+  }
+
+  async incr(key: string): Promise<number> {
+    return this.client.incr(key);
+  }
+
+  async expire(key: string, seconds: number): Promise<void> {
+    await this.client.expire(key, seconds);
+  }
+}
+
 const globalForRedis = globalThis as unknown as {
-  redis: Redis | undefined;
+  redis: RedisWrapper | null | undefined;
 };
 
-function createRedisClient() {
+function createRedisClient(): RedisWrapper | null {
   if (!process.env.REDIS_URL) {
     console.warn("[Redis] REDIS_URL not set — cache disabled");
     return null;
@@ -27,13 +66,13 @@ function createRedisClient() {
     console.log("[Redis] Connected");
   });
 
-  return client;
+  return new RedisWrapper(client);
 }
 
 export const redis = globalForRedis.redis ?? createRedisClient();
 
 if (process.env.NODE_ENV !== "production") {
-  globalForRedis.redis = redis ?? undefined;
+  globalForRedis.redis = redis;
 }
 
 export const CACHE_KEYS = {

@@ -24,8 +24,8 @@ export async function POST(request: Request) {
     const windowBucket = Math.floor(Date.now() / 1000 / SYNC_RATE_LIMIT_WINDOW_SECONDS);
     const rateLimitKey = `rate_limit:erp_sync:{${requesterId}}:${windowBucket}`;
 
-    const requestCount = await redis.incr(rateLimitKey);
-    if (requestCount === 1) {
+    const requestCount = redis ? await redis.incr(rateLimitKey) : 0;
+    if (redis && requestCount === 1) {
       await redis.expire(rateLimitKey, SYNC_RATE_LIMIT_WINDOW_SECONDS);
     }
 
