@@ -25,14 +25,15 @@ export async function GET(request: Request) {
 
     const summaries = await sql`
       SELECT
-        "month",
-        "planToShip",
-        "stitchedQty",
-        "balToSew"
-      FROM public."MonthlySummary"
-      WHERE "month" >= ${start}
-        AND "month" <= ${end}
-      ORDER BY "month" ASC
+        date_trunc('month', delivery_date) AS month,
+        SUM(COALESCE(order_qty, 0))::float AS "planToShip",
+        SUM(CASE WHEN ppm_status = 'APPROVED' THEN COALESCE(order_qty, 0) ELSE 0 END)::float AS "stitchedQty",
+        SUM(CASE WHEN ppm_status <> 'APPROVED' OR ppm_status IS NULL THEN COALESCE(order_qty, 0) ELSE 0 END)::float AS "balToSew"
+      FROM public.orders
+      WHERE delivery_date >= ${start}
+        AND delivery_date <= ${end}
+      GROUP BY date_trunc('month', delivery_date)
+      ORDER BY month ASC
     `;
 
     const grouped = new Map<string, { month: string; totalPlanned: number; totalStitched: number; balToSew: number }>();

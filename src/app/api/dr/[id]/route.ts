@@ -1,6 +1,7 @@
 import { ok, serverError, validationError } from '@/lib/api-response';
 import { updateDrEntrySchema } from "@/lib/erp-api";
 import { sql } from "@/lib/db";
+import { ensureDrEntriesTable } from "@/lib/cta-schema";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -12,14 +13,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return validationError(parsed.error);
     }
 
+    await ensureDrEntriesTable();
+
     const rows = await sql`
-      UPDATE public."DREntry"
+      UPDATE public.dr_entries
       SET
-        "onMachine" = COALESCE(${parsed.data.onMachine ?? null}, "onMachine"),
-        "offMachine" = COALESCE(${parsed.data.offMachine ?? null}, "offMachine"),
-        remarks = COALESCE(${parsed.data.remarks ?? null}, remarks)
+        on_machine = COALESCE(${parsed.data.onMachine ?? null}, on_machine),
+        off_machine = COALESCE(${parsed.data.offMachine ?? null}, off_machine),
+        remarks = COALESCE(${parsed.data.remarks ?? null}, remarks),
+        updated_at = NOW()
       WHERE id = ${id}
-      RETURNING id, "srNo", "orderNo", "onMachine", "offMachine", remarks
+      RETURNING
+        id,
+        sr_no AS "srNo",
+        order_no AS "orderNo",
+        on_machine AS "onMachine",
+        off_machine AS "offMachine",
+        remarks
     `;
     const entry = rows[0];
 

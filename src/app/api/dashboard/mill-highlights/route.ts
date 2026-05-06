@@ -4,16 +4,35 @@ import { sql } from "@/lib/db";
 export async function GET() {
   try {
     const labDipStrikeOff = await sql`
-      SELECT id, "reffNo", "vgReffNo", "sentDate", "sentBy", "deadlineMargin", status, "reportType"
-      FROM public."MillReport"
-      WHERE "reportType" IN ('LAB_DIP', 'STRIKE_OFF')
-      ORDER BY "createdAt" DESC
+      SELECT
+        id,
+        ref_no AS "reffNo",
+        ref_no AS "vgReffNo",
+        created_at AS "sentDate",
+        'System' AS "sentBy",
+        CASE
+          WHEN delivery_date < NOW() THEN 'Overdue'
+          ELSE CONCAT(GREATEST(0, EXTRACT(DAY FROM delivery_date - NOW()))::int, 'd buffer')
+        END AS "deadlineMargin",
+        CASE WHEN approval_pending THEN 'Pending' ELSE 'Sent' END AS status,
+        'LAB_DIP' AS "reportType"
+      FROM public.orders
+      ORDER BY delivery_date ASC NULLS LAST
       LIMIT 100
     `;
     const bulkFobApprovals = await sql`
-      SELECT id, "reffNo", "vgReffNo", buyer, brand, "styleNo", "styleName", "reqDate", status
-      FROM public."FobApproval"
-      ORDER BY "createdAt" DESC
+      SELECT
+        id,
+        ref_no AS "reffNo",
+        ref_no AS "vgReffNo",
+        buyer,
+        brand,
+        style_id AS "styleNo",
+        style_name AS "styleName",
+        delivery_date AS "reqDate",
+        CASE WHEN approval_pending THEN 'Pending' ELSE 'Sent' END AS status
+      FROM public.orders
+      ORDER BY delivery_date ASC NULLS LAST
       LIMIT 100
     `;
 

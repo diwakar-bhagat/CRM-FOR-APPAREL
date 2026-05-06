@@ -1,6 +1,7 @@
 import { ok, badRequest, serverError } from '@/lib/api-response';
 import { sql } from "@/lib/db";
 import { z } from 'zod';
+import { ensureNotificationsTable } from "@/lib/cta-schema";
 
 const updateNotificationSchema = z.object({
   isRead: z.boolean(),
@@ -16,11 +17,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return badRequest("Invalid request body: isRead must be a boolean");
     }
 
+    await ensureNotificationsTable();
+
     const rows = await sql`
-      UPDATE public."Notification"
-      SET "isRead" = ${parsed.data.isRead}
+      UPDATE public.notifications
+      SET is_read = ${parsed.data.isRead}
       WHERE id = ${id}
-      RETURNING id, "isRead"
+      RETURNING id, is_read AS "isRead"
     `;
     const notification = rows[0];
 

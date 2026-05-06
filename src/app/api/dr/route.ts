@@ -3,6 +3,7 @@ import { ok, serverError, validationError } from '@/lib/api-response';
 import { paginationQuerySchema } from '@/lib/erp-api';
 import { sql } from "@/lib/db";
 import { safeInt } from '@/lib/parse-utils';
+import { ensureDrEntriesTable } from "@/lib/cta-schema";
 
 const getDRSchema = paginationQuerySchema.extend({
   unit: z.string().optional(),
@@ -32,40 +33,39 @@ export async function GET(request: Request) {
 
     const weekNo = wk ? safeInt(wk) : null;
     const skip = (page - 1) * limit;
+
+    await ensureDrEntriesTable();
+
     const entries = await sql`
       SELECT
         d.id,
-        d."srNo",
-        d."orderNo",
-        d."styleDescription",
-        d."specialWork",
+        d.sr_no AS "srNo",
+        d.order_no AS "orderNo",
+        d.style_description AS "styleDescription",
+        d.special_work AS "specialWork",
         d.qty,
         d.tod,
-        d."wkNumber",
-        d."onMachine",
-        d."offMachine",
+        d.wk_number AS "wkNumber",
+        d.on_machine AS "onMachine",
+        d.off_machine AS "offMachine",
         d.remarks,
-        d."sheetSource",
-        json_build_object('name', b.name) AS buyer,
-        json_build_object('name', u.name) AS unit
-      FROM public."DREntry" d
-      JOIN public."Buyer" b ON b.id = d."buyerId"
-      JOIN public."Unit" u ON u.id = d."unitId"
-      WHERE (${unit}::text IS NULL OR u.name = ${unit})
-        AND (${buyer}::text IS NULL OR b.name = ${buyer})
-        AND (${weekNo}::int IS NULL OR d."wkNumber" = ${weekNo})
+        d.sheet_source AS "sheetSource",
+        json_build_object('name', d.buyer) AS buyer,
+        json_build_object('name', d.unit) AS unit
+      FROM public.dr_entries d
+      WHERE (${unit}::text IS NULL OR d.unit = ${unit})
+        AND (${buyer}::text IS NULL OR d.buyer = ${buyer})
+        AND (${weekNo}::int IS NULL OR d.wk_number = ${weekNo})
       ORDER BY d.tod ASC
       LIMIT ${limit}
       OFFSET ${skip}
     `;
     const totalRows = await sql`
       SELECT COUNT(*)::int AS count
-      FROM public."DREntry" d
-      JOIN public."Buyer" b ON b.id = d."buyerId"
-      JOIN public."Unit" u ON u.id = d."unitId"
-      WHERE (${unit}::text IS NULL OR u.name = ${unit})
-        AND (${buyer}::text IS NULL OR b.name = ${buyer})
-        AND (${weekNo}::int IS NULL OR d."wkNumber" = ${weekNo})
+      FROM public.dr_entries d
+      WHERE (${unit}::text IS NULL OR d.unit = ${unit})
+        AND (${buyer}::text IS NULL OR d.buyer = ${buyer})
+        AND (${weekNo}::int IS NULL OR d.wk_number = ${weekNo})
     `;
     const total = Number(totalRows[0]?.count ?? 0);
 

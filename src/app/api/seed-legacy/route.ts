@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { ensureOrderProcessTable } from "@/lib/cta-schema";
 import fs from "fs";
 import path from "path";
 
@@ -15,10 +16,8 @@ export async function POST() {
     }
 
     const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    await ensureOrderProcessTable();
     
-    // Wipe existing dummy data
-    await sql`DELETE FROM public.fabric_tracking`;
-    await sql`DELETE FROM public.trims_tracking`;
     await sql`DELETE FROM public.orders`;
 
     // We'll insert these into the public.orders table.
@@ -37,15 +36,9 @@ export async function POST() {
         if (Number.isNaN(orderDate.getTime())) orderDate = null;
       }
 
-      let targetPfhDate = null;
-      if (order.targetPfhDate && order.targetPfhDate !== '-') {
-        targetPfhDate = new Date(order.targetPfhDate);
-        if (Number.isNaN(targetPfhDate.getTime())) targetPfhDate = null;
-      }
-
       const res = await sql`
         INSERT INTO public.orders (
-          ref_no, buyer, brand, style_id, style_name, order_qty, delivery_date, target_pfh_date
+          ref_no, buyer, brand, style_id, style_name, order_qty, delivery_date
         ) VALUES (
           ${order.refNo}, 
           ${order.buyer}, 
@@ -53,8 +46,7 @@ export async function POST() {
           ${order.styleNo}, 
           ${order.styleName}, 
           ${order.orderQty}, 
-          ${deliveryDate}, 
-          ${targetPfhDate}
+          ${deliveryDate}
         )
         RETURNING id
       `;
@@ -63,13 +55,9 @@ export async function POST() {
         const orderId = res[0].id;
         
         await sql`
-          INSERT INTO public.fabric_tracking (order_id, status_red, status_orange, status_green)
-          VALUES (${orderId}, 0, 0, 0)
-        `;
-
-        await sql`
-          INSERT INTO public.trims_tracking (order_id, status_red, status_orange, status_green)
-          VALUES (${orderId}, 0, 0, 0)
+          INSERT INTO public.order_processes (order_id)
+          VALUES (${orderId})
+          ON CONFLICT (order_id) DO NOTHING
         `;
       }
     }

@@ -1,15 +1,41 @@
-import Redis from "ioredis";
+type RedisCommandResult<T> = {
+  result?: T;
+  error?: string;
+};
 
-/** Thin wrapper that exposes an Upstash-compatible API over ioredis. */
-class RedisWrapper {
-  private client: Redis;
+class UpstashRestRedis {
+  private url: string;
+  private token: string;
 
-  constructor(client: Redis) {
-    this.client = client;
+  constructor(url: string, token: string) {
+    this.url = url.replace(/\/$/, "");
+    this.token = token;
+  }
+
+  private async command<T>(args: Array<string | number>): Promise<T> {
+    const response = await fetch(this.url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(args),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upstash command failed with status ${response.status}`);
+    }
+
+    const payload = (await response.json()) as RedisCommandResult<T>;
+    if (payload.error) {
+      throw new Error(payload.error);
+    }
+    return payload.result as T;
   }
 
   async get<T>(key: string): Promise<T | null> {
-    const value = await this.client.get(key);
+    const value = await this.command<string | null>(["GET", key]);
     if (value === null) return null;
     try {
       return JSON.parse(value) as T;
@@ -20,59 +46,98 @@ class RedisWrapper {
 
   async set(key: string, value: string, options?: { ex?: number }): Promise<void> {
     if (options?.ex) {
-      await this.client.set(key, value, "EX", options.ex);
-    } else {
-      await this.client.set(key, value);
+      await this.command(["SET", key, value, "EX", options.ex]);
+      return;
     }
+    await this.command(["SET", key, value]);
   }
 
-  async del(key: string): Promise<void> {
-    await this.client.del(key);
+  async del(...keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+    await this.command(["DEL", ...keys]);
   }
 
   async incr(key: string): Promise<number> {
-    return this.client.incr(key);
+    return this.command<number>(["INCR", key]);
   }
 
   async expire(key: string, seconds: number): Promise<void> {
-    await this.client.expire(key, seconds);
+    await this.command(["EXPIRE", key, seconds]);
+  }
+
+  async scan(cursor: number, options: { match?: string; count?: number } = {}): Promise<[number, string[]]> {
+    const args: Array<string | number> = ["SCAN", cursor];
+    if (options.match) args.push("MATCH", options.match);
+    if (options.count) args.push("COUNT", options.count);
+    const [nextCursor, keys] = await this.command<[string, string[]]>(args);
+    return [Number(nextCursor), keys];
   }
 }
 
-const globalForRedis = globalThis as unknown as {
-  redis: RedisWrapper | null | undefined;
-};
+function createRedisClient(): UpstashRestRedis | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-function createRedisClient(): RedisWrapper | null {
-  if (!process.env.REDIS_URL) {
-    console.warn("[Redis] REDIS_URL not set — cache disabled");
+  if (!url || !token) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[Redis] Upstash REST env vars not set - cache disabled");
+    }
     return null;
   }
 
-  const client = new Redis(process.env.REDIS_URL, {
-    maxRetriesPerRequest: 3,
-    retryStrategy(times) {
-      if (times > 3) return null;
-      return Math.min(times * 200, 1000);
-    },
-    enableOfflineQueue: false,
-  });
-
-  client.on("error", (err) => {
-    console.error("[Redis] Error:", err.message);
-  });
-
-  client.on("connect", () => {
-    console.log("[Redis] Connected");
-  });
-
-  return new RedisWrapper(client);
+  return new UpstashRestRedis(url, token);
 }
 
-export const redis = globalForRedis.redis ?? createRedisClient();
+export const redis = createRedisClient();
 
-if (process.env.NODE_ENV !== "production") {
-  globalForRedis.redis = redis;
+export async function cacheGet<T>(key: string): Promise<T | null> {
+  if (!redis) return null;
+  try {
+    return await redis.get<T>(key);
+  } catch (error) {
+    console.error("[Redis] cacheGet failed:", (error as Error).message);
+    return null;
+  }
+}
+
+export async function cacheSet(key: string, value: unknown, ttlSeconds = 60): Promise<void> {
+  if (!redis) return;
+  try {
+    await redis.set(key, JSON.stringify(value), { ex: ttlSeconds });
+  } catch (error) {
+    console.error("[Redis] cacheSet failed:", (error as Error).message);
+  }
+}
+
+export async function invalidateKeys(...keys: string[]): Promise<void> {
+  if (!redis || keys.length === 0) return;
+  try {
+    await redis.del(...keys);
+  } catch (error) {
+    console.error("[Redis] invalidateKeys failed:", (error as Error).message);
+  }
+}
+
+export async function invalidateByPrefix(prefix: string): Promise<void> {
+  if (!redis) return;
+  try {
+    let cursor = 0;
+    const keys: string[] = [];
+    do {
+      const [nextCursor, batch] = await redis.scan(cursor, {
+        match: `${prefix}*`,
+        count: 100,
+      });
+      cursor = nextCursor;
+      keys.push(...batch);
+    } while (cursor !== 0);
+
+    if (keys.length > 0) {
+      await redis.del(...keys);
+    }
+  } catch (error) {
+    console.error("[Redis] invalidateByPrefix failed:", (error as Error).message);
+  }
 }
 
 export const CACHE_KEYS = {
