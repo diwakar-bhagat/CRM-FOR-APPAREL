@@ -1,7 +1,6 @@
-import { createOrderSchema, paginationQuerySchema } from "@/lib/erp-api";
-import { ok, created, serverError, validationError } from "@/lib/api-response";
+import { paginationQuerySchema } from "@/lib/erp-api";
+import { ok, serverError, validationError } from "@/lib/api-response";
 import { sql } from "@/lib/db";
-import { randomUUID } from "node:crypto";
 
 export async function GET(request: Request) {
   try {
@@ -10,12 +9,22 @@ export async function GET(request: Request) {
     const distinct = params.get("distinct");
     
     if (distinct === "buyers") {
-      const buyers = await sql`SELECT name FROM public."Buyer" ORDER BY name ASC`;
+      const buyers = await sql`
+        SELECT DISTINCT buyer AS name
+        FROM public.orders
+        WHERE buyer IS NOT NULL AND buyer <> ''
+        ORDER BY buyer ASC
+      `;
       return ok(buyers.map((buyer: any) => buyer.name));
     }
     
     if (distinct === "months") {
-      const months = await sql`SELECT DISTINCT month FROM public."Order" ORDER BY month ASC`;
+      const months = await sql`
+        SELECT DISTINCT TO_CHAR(delivery_date, 'YYYY-MM') AS month
+        FROM public.orders
+        WHERE delivery_date IS NOT NULL
+        ORDER BY month ASC
+      `;
       return ok(months.map((item: any) => item.month));
     }
 
@@ -30,7 +39,6 @@ export async function GET(request: Request) {
 
     const month = params.get("month");
     const buyer = params.get("buyer");
-    const unit = params.get("unit");
     const status = params.get("status");
     const search = params.get("search");
     const { page, limit } = parsedPagination.data;
@@ -40,52 +48,67 @@ export async function GET(request: Request) {
     const orders = await sql`
       SELECT
         o.id,
-        o."orderNo",
-        o."styleDescription",
-        o.qty,
-        o.month,
-        o."planStatus",
-        o."exFactoryDate",
-        o."pcdPlan",
-        o."fileHoDate",
-        o."rdDate",
-        json_build_object('id', b.id, 'name', b.name) AS buyer,
-        json_build_object('id', u.id, 'name', u.name) AS unit
-      FROM public."Order" o
-      JOIN public."Buyer" b ON b.id = o."buyerId"
-      JOIN public."Unit" u ON u.id = o."unitId"
-      WHERE (${month}::text IS NULL OR o.month = ${month})
-        AND (${status}::text IS NULL OR o."planStatus" = ${status})
-        AND (${buyer}::text IS NULL OR b.name = ${buyer})
-        AND (${unit}::text IS NULL OR u.name = ${unit})
+        o.ref_no,
+        o.ref_no AS "refNo",
+        o.buyer,
+        o.brand,
+        o.style_id,
+        o.style_id AS "styleId",
+        o.style_name,
+        o.style_name AS "styleName",
+        o.order_qty,
+        o.order_qty AS "orderQty",
+        o.delivery_date,
+        o.delivery_date AS "deliveryDate",
+        o.pfh_status,
+        o.pfh_status AS "pfhStatus",
+        o.sop_status,
+        o.sop_status AS "sopStatus",
+        o.ppm_status,
+        o.ppm_status AS "ppmStatus",
+        o.approval_pending,
+        o.approval_pending AS "approvalPending",
+        o.vendor_last_active,
+        o.vendor_last_active AS "vendorLastActive",
+        o.created_at,
+        o.created_at AS "createdAt",
+        o.updated_at,
+        o.updated_at AS "updatedAt"
+      FROM public.orders o
+      WHERE (${month}::text IS NULL OR TO_CHAR(o.delivery_date, 'YYYY-MM') = ${month})
+        AND (${status}::text IS NULL OR ${status}::text = 'All' OR ${status}::text = 'All Items')
+        AND (${buyer}::text IS NULL OR o.buyer = ${buyer})
         AND (
           ${searchPattern}::text IS NULL
-          OR o."orderNo" ILIKE ${searchPattern}
-          OR o."styleDescription" ILIKE ${searchPattern}
+          OR o.ref_no ILIKE ${searchPattern}
+          OR o.style_id ILIKE ${searchPattern}
+          OR o.style_name ILIKE ${searchPattern}
+          OR o.buyer ILIKE ${searchPattern}
+          OR o.brand ILIKE ${searchPattern}
         )
-      ORDER BY o."createdAt" DESC
+      ORDER BY o.delivery_date ASC NULLS LAST, o.ref_no ASC
       LIMIT ${limit}
       OFFSET ${skip}
     `;
     const totalRows = await sql`
       SELECT COUNT(*)::int AS count
-      FROM public."Order" o
-      JOIN public."Buyer" b ON b.id = o."buyerId"
-      JOIN public."Unit" u ON u.id = o."unitId"
-      WHERE (${month}::text IS NULL OR o.month = ${month})
-        AND (${status}::text IS NULL OR o."planStatus" = ${status})
-        AND (${buyer}::text IS NULL OR b.name = ${buyer})
-        AND (${unit}::text IS NULL OR u.name = ${unit})
+      FROM public.orders o
+      WHERE (${month}::text IS NULL OR TO_CHAR(o.delivery_date, 'YYYY-MM') = ${month})
+        AND (${status}::text IS NULL OR ${status}::text = 'All' OR ${status}::text = 'All Items')
+        AND (${buyer}::text IS NULL OR o.buyer = ${buyer})
         AND (
           ${searchPattern}::text IS NULL
-          OR o."orderNo" ILIKE ${searchPattern}
-          OR o."styleDescription" ILIKE ${searchPattern}
+          OR o.ref_no ILIKE ${searchPattern}
+          OR o.style_id ILIKE ${searchPattern}
+          OR o.style_name ILIKE ${searchPattern}
+          OR o.buyer ILIKE ${searchPattern}
+          OR o.brand ILIKE ${searchPattern}
         )
     `;
     const total = Number(totalRows[0]?.count ?? 0);
 
     const pages = Math.ceil(total / limit);
-    return ok(orders, { total, page, pages });
+    return Response.json({ orders, data: orders, total, page, pages });
   } catch (error) {
     return serverError(error);
   }
@@ -93,34 +116,37 @@ export async function GET(request: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json() as unknown;
-    const parsed = createOrderSchema.safeParse(body);
-    
-    if (!parsed.success) {
-      return validationError(parsed.error);
-    }
-
-    const id = randomUUID();
-    const data = parsed.data;
+    const data = await req.json() as any;
     const rows = await sql`
-      INSERT INTO public."Order" (
-        id, "orderNo", "styleDescription", qty, "buyerId", "unitId", month,
-        "specialWork", sam, "totalQty", "fabricSupplier", "fabricInhDate",
-        "exFactoryDate", "revisedExFactory", "pcdPlan", "fileHoDate", "rdDate",
-        "ppComments", remarks, "planStatus", fob, "totalCost", "producedSam", "prodLeadTime",
-        "createdAt", "updatedAt"
+      INSERT INTO public.orders (
+        ref_no, buyer, brand, style_id, style_name, order_qty, delivery_date
       ) VALUES (
-        ${id}, ${data.orderNo}, ${data.styleDescription}, ${data.qty}, ${data.buyerId}, ${data.unitId}, ${data.month},
-        ${data.specialWork ?? null}, ${data.sam ?? null}, ${data.totalQty ?? null}, ${data.fabricSupplier ?? null}, ${data.fabricInhDate ?? null},
-        ${data.exFactoryDate ?? null}, ${data.revisedExFactory ?? null}, ${data.pcdPlan ?? null}, ${data.fileHoDate ?? null}, ${data.rdDate ?? null},
-        ${data.ppComments ?? null}, ${data.remarks ?? null}, ${data.planStatus ?? null}, ${data.fob ?? null}, ${data.totalCost ?? null}, ${data.producedSam ?? null}, ${data.prodLeadTime ?? null},
-        NOW(), NOW()
+        ${data.refNo ?? data.ref_no},
+        ${data.buyer},
+        ${data.brand ?? null},
+        ${data.styleNo ?? data.styleId ?? data.style_id ?? null},
+        ${data.styleName ?? data.style_name ?? null},
+        ${Number(data.orderQty ?? data.order_qty ?? 0)},
+        ${data.deliveryDate ? new Date(data.deliveryDate) : null}
       )
-      RETURNING id, "orderNo", "styleDescription", qty, month
+      RETURNING
+        id,
+        ref_no,
+        ref_no AS "refNo",
+        buyer,
+        brand,
+        style_id,
+        style_id AS "styleId",
+        style_name,
+        style_name AS "styleName",
+        order_qty,
+        order_qty AS "orderQty",
+        delivery_date,
+        delivery_date AS "deliveryDate"
     `;
     const order = rows[0];
 
-    return created(order);
+    return Response.json({ order, data: order }, { status: 201 });
   } catch (error) {
     return serverError(error);
   }
