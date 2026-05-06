@@ -1,5 +1,5 @@
 import { ok, badRequest, serverError } from '@/lib/api-response';
-import { prisma } from "@/lib/prisma";
+import { sql } from "@/lib/db";
 import { z } from 'zod';
 
 const updateNotificationSchema = z.object({
@@ -16,14 +16,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return badRequest("Invalid request body: isRead must be a boolean");
     }
 
-    const notification = await prisma.notification.update({
-      where: { id },
-      data: { isRead: parsed.data.isRead },
-      select: {
-        id: true,
-        isRead: true,
-      },
-    });
+    const rows = await sql`
+      UPDATE public."Notification"
+      SET "isRead" = ${parsed.data.isRead}
+      WHERE id = ${id}
+      RETURNING id, "isRead"
+    `;
+    const notification = rows[0];
 
     return ok(notification);
   } catch (error) {

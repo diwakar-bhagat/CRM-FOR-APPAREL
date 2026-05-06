@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ok, serverError, validationError } from '@/lib/api-response';
 import { paginationQuerySchema } from '@/lib/erp-api';
-import { prisma } from "@/lib/prisma";
+import { sql } from "@/lib/db";
 import { safeInt } from '@/lib/parse-utils';
 
 const getDRSchema = paginationQuerySchema.extend({
@@ -30,37 +30,44 @@ export async function GET(request: Request) {
 
     const { unit, buyer, wk, status, page, limit } = parsed.data;
 
-    const where = {
-      ...(unit ? { unit: { name: unit } } : {}),
-      ...(buyer ? { buyer: { name: buyer } } : {}),
-      ...(wk ? { wkNumber: safeInt(wk) } : {}),
-    };
-
-    const [entries, total] = await Promise.all([
-      prisma.dREntry.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { tod: "asc" },
-        select: {
-          id: true,
-          srNo: true,
-          orderNo: true,
-          styleDescription: true,
-          specialWork: true,
-          qty: true,
-          tod: true,
-          wkNumber: true,
-          onMachine: true,
-          offMachine: true,
-          remarks: true,
-          sheetSource: true,
-          buyer: { select: { name: true } },
-          unit: { select: { name: true } },
-        },
-      }),
-      prisma.dREntry.count({ where }),
-    ]);
+    const weekNo = wk ? safeInt(wk) : null;
+    const skip = (page - 1) * limit;
+    const entries = await sql`
+      SELECT
+        d.id,
+        d."srNo",
+        d."orderNo",
+        d."styleDescription",
+        d."specialWork",
+        d.qty,
+        d.tod,
+        d."wkNumber",
+        d."onMachine",
+        d."offMachine",
+        d.remarks,
+        d."sheetSource",
+        json_build_object('name', b.name) AS buyer,
+        json_build_object('name', u.name) AS unit
+      FROM public."DREntry" d
+      JOIN public."Buyer" b ON b.id = d."buyerId"
+      JOIN public."Unit" u ON u.id = d."unitId"
+      WHERE (${unit}::text IS NULL OR u.name = ${unit})
+        AND (${buyer}::text IS NULL OR b.name = ${buyer})
+        AND (${weekNo}::int IS NULL OR d."wkNumber" = ${weekNo})
+      ORDER BY d.tod ASC
+      LIMIT ${limit}
+      OFFSET ${skip}
+    `;
+    const totalRows = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM public."DREntry" d
+      JOIN public."Buyer" b ON b.id = d."buyerId"
+      JOIN public."Unit" u ON u.id = d."unitId"
+      WHERE (${unit}::text IS NULL OR u.name = ${unit})
+        AND (${buyer}::text IS NULL OR b.name = ${buyer})
+        AND (${weekNo}::int IS NULL OR d."wkNumber" = ${weekNo})
+    `;
+    const total = Number(totalRows[0]?.count ?? 0);
 
     const filtered =
       status && status !== "All"

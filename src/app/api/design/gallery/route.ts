@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ok, serverError, validationError } from '@/lib/api-response';
 import { paginationQuerySchema } from "@/lib/erp-api";
-import { prisma } from "@/lib/prisma";
+import { sql } from "@/lib/db";
 
 const getDesignGallerySchema = paginationQuerySchema.extend({
   buyer: z.string().optional(),
@@ -25,31 +25,32 @@ export async function GET(request: Request) {
 
     const { buyer, status, page, limit } = parsed.data;
 
-    const where = {
-      ...(buyer ? { buyer: { equals: buyer, mode: "insensitive" as const } } : {}),
-      ...(status ? { status: { equals: status, mode: "insensitive" as const } } : {}),
-    };
-
-    const [designs, total] = await Promise.all([
-      prisma.design.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          galleryId: true,
-          styleNo: true,
-          buyer: true,
-          designer: true,
-          season: true,
-          status: true,
-          imageUrl: true,
-          createdAt: true,
-        },
-      }),
-      prisma.design.count({ where }),
-    ]);
+    const skip = (page - 1) * limit;
+    const designs = await sql`
+      SELECT
+        id,
+        "galleryId",
+        "styleNo",
+        buyer,
+        designer,
+        season,
+        status,
+        "imageUrl",
+        "createdAt"
+      FROM public."Design"
+      WHERE (${buyer}::text IS NULL OR buyer ILIKE ${buyer})
+        AND (${status}::text IS NULL OR status ILIKE ${status})
+      ORDER BY "createdAt" DESC
+      LIMIT ${limit}
+      OFFSET ${skip}
+    `;
+    const totalRows = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM public."Design"
+      WHERE (${buyer}::text IS NULL OR buyer ILIKE ${buyer})
+        AND (${status}::text IS NULL OR status ILIKE ${status})
+    `;
+    const total = Number(totalRows[0]?.count ?? 0);
 
     const pages = Math.ceil(total / limit);
     return ok(designs, { total, page, pages });

@@ -1,6 +1,6 @@
 import { ok, serverError, validationError } from '@/lib/api-response';
 import { paginationQuerySchema } from "@/lib/erp-api";
-import { prisma } from "@/lib/prisma";
+import { sql } from "@/lib/db";
 import { isValidDate } from '@/lib/parse-utils';
 
 export async function GET(request: Request) {
@@ -21,43 +21,60 @@ export async function GET(request: Request) {
     
     const { page, limit } = parsedPagination.data;
 
-    const where = {
-      ...(buyer ? { buyer: { name: buyer } } : {}),
-      ...(deliveryDate && isValidDate(deliveryDate) 
-        ? { exFactoryDate: new Date(deliveryDate) } 
-        : {}),
-    };
-
-    const [orders, total] = await Promise.all([
-      prisma.order.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { exFactoryDate: "asc" },
-        select: {
-          id: true,
-          orderNo: true,
-          styleDescription: true,
-          qty: true,
-          month: true,
-          planStatus: true,
-          exFactoryDate: true,
-          fileHoDate: true,
-          pcdPlan: true,
-          finalPcdClosure: true,
-          rdDate: true,
-          ppComments: true,
-          specialWork: true,
-          fob: true,
-          buyer: { select: { name: true } },
-          productionEntries: {
-            select: { id: true, balanceStitchQty: true, balanceSpecialWork: true },
-          },
-          trimStatus: { select: { id: true, trimStatus: true } },
-        },
-      }),
-      prisma.order.count({ where }),
-    ]);
+    const exFactoryDate = deliveryDate && isValidDate(deliveryDate) ? new Date(deliveryDate) : null;
+    const skip = (page - 1) * limit;
+    const orders = await sql`
+      SELECT
+        o.id,
+        o."orderNo",
+        o."styleDescription",
+        o.qty,
+        o.month,
+        o."planStatus",
+        o."exFactoryDate",
+        o."fileHoDate",
+        o."pcdPlan",
+        o."finalPcdClosure",
+        o."rdDate",
+        o."ppComments",
+        o."specialWork",
+        o.fob,
+        json_build_object('name', b.name) AS buyer,
+        COALESCE(pe.items, '[]'::json) AS "productionEntries",
+        COALESCE(te.items, '[]'::json) AS "trimStatus"
+      FROM public."Order" o
+      JOIN public."Buyer" b ON b.id = o."buyerId"
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object(
+          'id', id,
+          'balanceStitchQty', "balanceStitchQty",
+          'balanceSpecialWork', "balanceSpecialWork"
+        )) AS items
+        FROM public."ProductionEntry"
+        WHERE "orderId" = o.id
+      ) pe ON true
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object(
+          'id', id,
+          'trimStatus', "trimStatus"
+        )) AS items
+        FROM public."TrimEntry"
+        WHERE "orderId" = o.id
+      ) te ON true
+      WHERE (${buyer}::text IS NULL OR b.name = ${buyer})
+        AND (${exFactoryDate}::timestamptz IS NULL OR o."exFactoryDate" = ${exFactoryDate})
+      ORDER BY o."exFactoryDate" ASC
+      LIMIT ${limit}
+      OFFSET ${skip}
+    `;
+    const totalRows = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM public."Order" o
+      JOIN public."Buyer" b ON b.id = o."buyerId"
+      WHERE (${buyer}::text IS NULL OR b.name = ${buyer})
+        AND (${exFactoryDate}::timestamptz IS NULL OR o."exFactoryDate" = ${exFactoryDate})
+    `;
+    const total = Number(totalRows[0]?.count ?? 0);
 
     const enrichedOrders = orders.map((order: any) => ({
       ...order,

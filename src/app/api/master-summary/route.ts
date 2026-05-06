@@ -1,22 +1,16 @@
 import { ok, serverError } from '@/lib/api-response';
-import { prisma } from "@/lib/prisma";
+import { sql } from "@/lib/db";
 
 export async function GET() {
   try {
-    const summaries = await prisma.monthlySummary.findMany({
-      orderBy: { month: "asc" },
-      select: {
-        id: true,
-        month: true,
-        buyerName: true,
-        planToShip: true,
-        stitchedQty: true,
-        balToSew: true,
-      },
-    });
+    const summaries = await sql`
+      SELECT id, month, "buyerName", "planToShip", "stitchedQty", "balToSew"
+      FROM public."MonthlySummary"
+      ORDER BY month ASC
+    `;
 
     const buyers = [...new Set(summaries.map((item: any) => item.buyerName))];
-    const months = [...new Set(summaries.map((item: any) => item.month.toISOString().slice(0, 7)))];
+    const months = [...new Set(summaries.map((item: any) => new Date(item.month as string | Date).toISOString().slice(0, 7)))];
 
     return ok({ summaries, buyers, months });
   } catch (error) {

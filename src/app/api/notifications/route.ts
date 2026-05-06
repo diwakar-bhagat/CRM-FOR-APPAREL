@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ok, serverError, validationError } from '@/lib/api-response';
 import { paginationQuerySchema } from '@/lib/erp-api';
-import { prisma } from "@/lib/prisma";
+import { sql } from "@/lib/db";
 
 const getNotificationsSchema = paginationQuerySchema.extend({
   read: z.enum(['true', 'false']).optional(),
@@ -22,28 +22,33 @@ export async function GET(request: Request) {
     }
 
     const { read, page, limit } = parsed.data;
-    const where = read ? { isRead: read === 'true' } : undefined;
+    const isRead = read === undefined ? null : read === "true";
+    const skip = (page - 1) * limit;
 
-    const [notifications, total, unreadCount] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          reffNo: true,
-          styleName: true,
-          message: true,
-          createdBy: true,
-          isRead: true,
-          type: true,
-          createdAt: true,
-        },
-      }),
-      prisma.notification.count({ where }),
-      prisma.notification.count({ where: { isRead: false } }),
-    ]);
+    const notifications = await sql`
+      SELECT
+        id,
+        "reffNo",
+        "styleName",
+        message,
+        "createdBy",
+        "isRead",
+        type,
+        "createdAt"
+      FROM public."Notification"
+      WHERE (${isRead}::boolean IS NULL OR "isRead" = ${isRead})
+      ORDER BY "createdAt" DESC
+      LIMIT ${limit}
+      OFFSET ${skip}
+    `;
+    const totalRows = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM public."Notification"
+      WHERE (${isRead}::boolean IS NULL OR "isRead" = ${isRead})
+    `;
+    const unreadRows = await sql`SELECT COUNT(*)::int AS count FROM public."Notification" WHERE "isRead" = false`;
+    const total = Number(totalRows[0]?.count ?? 0);
+    const unreadCount = Number(unreadRows[0]?.count ?? 0);
 
     const pages = Math.ceil(total / limit);
     return ok({ notifications, unreadCount }, { total, page, pages });

@@ -1,37 +1,22 @@
 import { ok, serverError } from '@/lib/api-response';
-import { prisma } from "@/lib/prisma";
+import { sql } from "@/lib/db";
 
 export async function GET() {
   try {
-    const [initialRdSopReport, bulkEmbroideryOrder] = await Promise.all([
-      prisma.order.findMany({
-        where: { rdDate: { not: null } },
-        orderBy: { rdDate: "desc" },
-        take: 100,
-        select: {
-          id: true,
-          orderNo: true,
-          styleDescription: true,
-          planStatus: true,
-          qty: true,
-          month: true,
-        },
-      }),
-      prisma.order.findMany({
-        where: { specialWork: { contains: "Emb.", mode: "insensitive" } },
-        orderBy: { createdAt: "desc" },
-        take: 100,
-        select: {
-          id: true,
-          orderNo: true,
-          styleDescription: true,
-          specialWork: true,
-          planStatus: true,
-          qty: true,
-          month: true,
-        },
-      }),
-    ]);
+    const initialRdSopReport = await sql`
+      SELECT id, "orderNo", "styleDescription", "planStatus", qty, month
+      FROM public."Order"
+      WHERE "rdDate" IS NOT NULL
+      ORDER BY "rdDate" DESC
+      LIMIT 100
+    `;
+    const bulkEmbroideryOrder = await sql`
+      SELECT id, "orderNo", "styleDescription", "specialWork", "planStatus", qty, month
+      FROM public."Order"
+      WHERE "specialWork" ILIKE '%Emb.%'
+      ORDER BY "createdAt" DESC
+      LIMIT 100
+    `;
 
     return ok({
       initialRdSopReport,

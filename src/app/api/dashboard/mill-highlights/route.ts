@@ -1,40 +1,21 @@
 import { ok, serverError } from '@/lib/api-response';
-import { prisma } from "@/lib/prisma";
+import { sql } from "@/lib/db";
 
 export async function GET() {
   try {
-    const [labDipStrikeOff, bulkFobApprovals] = await Promise.all([
-      prisma.millReport.findMany({
-        where: { reportType: { in: ["LAB_DIP", "STRIKE_OFF"] } },
-        orderBy: { createdAt: "desc" },
-        take: 100,
-        select: {
-          id: true,
-          reffNo: true,
-          vgReffNo: true,
-          sentDate: true,
-          sentBy: true,
-          deadlineMargin: true,
-          status: true,
-          reportType: true,
-        },
-      }),
-      prisma.fobApproval.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 100,
-        select: {
-          id: true,
-          reffNo: true,
-          vgReffNo: true,
-          buyer: true,
-          brand: true,
-          styleNo: true,
-          styleName: true,
-          reqDate: true,
-          status: true,
-        },
-      }),
-    ]);
+    const labDipStrikeOff = await sql`
+      SELECT id, "reffNo", "vgReffNo", "sentDate", "sentBy", "deadlineMargin", status, "reportType"
+      FROM public."MillReport"
+      WHERE "reportType" IN ('LAB_DIP', 'STRIKE_OFF')
+      ORDER BY "createdAt" DESC
+      LIMIT 100
+    `;
+    const bulkFobApprovals = await sql`
+      SELECT id, "reffNo", "vgReffNo", buyer, brand, "styleNo", "styleName", "reqDate", status
+      FROM public."FobApproval"
+      ORDER BY "createdAt" DESC
+      LIMIT 100
+    `;
 
     return ok({
       labDipStrikeOff,

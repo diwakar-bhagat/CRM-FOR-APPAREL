@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ok, serverError, validationError } from '@/lib/api-response';
-import { prisma } from "@/lib/prisma";
+import { sql } from "@/lib/db";
 import { safeInt } from '@/lib/parse-utils';
 
 const getAnalyticsSchema = z.object({
@@ -23,26 +23,25 @@ export async function GET(request: Request) {
     const start = new Date(`${year}-01-01`);
     const end = new Date(`${year}-12-31`);
 
-    const summaries = await prisma.monthlySummary.findMany({
-      where: {
-        month: { gte: start, lte: end },
-      },
-      select: {
-        month: true,
-        planToShip: true,
-        stitchedQty: true,
-        balToSew: true,
-      },
-      orderBy: { month: "asc" },
-    });
+    const summaries = await sql`
+      SELECT
+        "month",
+        "planToShip",
+        "stitchedQty",
+        "balToSew"
+      FROM public."MonthlySummary"
+      WHERE "month" >= ${start}
+        AND "month" <= ${end}
+      ORDER BY "month" ASC
+    `;
 
     const grouped = new Map<string, { month: string; totalPlanned: number; totalStitched: number; balToSew: number }>();
     for (const item of summaries) {
-      const month = item.month.toISOString().slice(0, 7);
+      const month = new Date(item.month as string | Date).toISOString().slice(0, 7);
       const current = grouped.get(month) ?? { month, totalPlanned: 0, totalStitched: 0, balToSew: 0 };
-      current.totalPlanned += item.planToShip ?? 0;
-      current.totalStitched += item.stitchedQty ?? 0;
-      current.balToSew += item.balToSew ?? 0;
+      current.totalPlanned += Number(item.planToShip ?? 0);
+      current.totalStitched += Number(item.stitchedQty ?? 0);
+      current.balToSew += Number(item.balToSew ?? 0);
       grouped.set(month, current);
     }
 
