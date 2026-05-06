@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
     const buyer = searchParams.get("buyer");
     const season = searchParams.get("season");
     const status = searchParams.get("status");
+    const search = searchParams.get("search");
+    const searchPattern = search ? `%${search}%` : null;
 
     const items = await sql`
       SELECT
@@ -46,10 +48,18 @@ export async function GET(req: NextRequest) {
       WHERE (${buyer}::text IS NULL OR buyer = ${buyer})
         AND (${season}::text IS NULL OR season = ${season})
         AND (${status}::text IS NULL OR status = ${status})
+        AND (
+          ${searchPattern}::text IS NULL
+          OR style_no ILIKE ${searchPattern}
+          OR COALESCE(style_name, '') ILIKE ${searchPattern}
+          OR buyer ILIKE ${searchPattern}
+          OR designer ILIKE ${searchPattern}
+          OR season ILIKE ${searchPattern}
+        )
       ORDER BY created_at DESC
     `;
 
-    return NextResponse.json({ items, designs: items, data: items });
+    return NextResponse.json({ success: true, items, designs: items, data: items, total: items.length });
   } catch (error) {
     console.error("[design-vault:get] failed:", (error as Error).message);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -91,7 +101,7 @@ export async function POST(req: NextRequest) {
     `;
 
     await invalidateByPrefix("design-vault:");
-    return NextResponse.json(rows[0], { status: 201 });
+    return NextResponse.json({ success: true, item: rows[0], data: rows[0] }, { status: 201 });
   } catch (error) {
     console.error("[design-vault:post] failed:", (error as Error).message);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

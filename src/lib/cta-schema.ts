@@ -369,3 +369,49 @@ export async function ensurePriorityTables() {
     )
   `;
 }
+
+export async function ensureSupplierPerformanceTables() {
+  await ensureOrdersTable();
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.supplier_performance_events (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      supplier_name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'fabric',
+      buyer TEXT,
+      order_ref TEXT,
+      due_date TIMESTAMPTZ,
+      actual_date TIMESTAMPTZ,
+      quality_status TEXT NOT NULL DEFAULT 'PENDING',
+      rejection_count INTEGER NOT NULL DEFAULT 0,
+      delay_days INTEGER NOT NULL DEFAULT 0,
+      remarks TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+}
+
+export async function ensureInitialCostingTable() {
+  await ensureOrdersTable();
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.initial_costings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      buyer TEXT NOT NULL,
+      style_no TEXT NOT NULL,
+      style_name TEXT,
+      order_qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+      fabric_cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+      trim_cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+      process_cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+      embroidery_cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+      washing_cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+      overhead NUMERIC(12,2) NOT NULL DEFAULT 0,
+      margin NUMERIC(6,2) NOT NULL DEFAULT 20,
+      final_fob NUMERIC(12,2) NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+}

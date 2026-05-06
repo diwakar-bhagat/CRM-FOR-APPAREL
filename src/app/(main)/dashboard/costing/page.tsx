@@ -1,11 +1,5 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { InitialCostingView } from "@/components/costing/initial-costing-view";
 
 export default function CostingPage() {
-  return (
-    <OperationsScreen
-      mode="costing"
-      title="Costing and Profitability"
-      description="Bill of materials and profitability review by style."
-    />
-  );
+  return <InitialCostingView />;
 }

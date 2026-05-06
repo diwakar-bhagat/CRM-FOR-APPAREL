@@ -1,11 +1,5 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { SampleTrackingView } from "@/components/sample-tracking/sample-tracking-view";
 
 export default function SampleCreatePage() {
-  return (
-    <OperationsScreen
-      mode="sample-create"
-      title="Sample Create"
-      description="Create and review sampling requests against live order references."
-    />
-  );
+  return <SampleTrackingView />;
 }

@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     await invalidateKeys(`design-vault:item:${id}`);
     await invalidateByPrefix("design-vault:list:");
-    return NextResponse.json(rows[0]);
+    return NextResponse.json({ success: true, item: rows[0], data: rows[0] });
   } catch (error) {
     console.error("[design-vault:patch] failed:", (error as Error).message);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -65,7 +65,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     await sql`DELETE FROM public.design_vault_items WHERE id::text = ${id}`;
     await invalidateKeys(`design-vault:item:${id}`);
     await invalidateByPrefix("design-vault:list:");
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, data: { deleted: true } });
   } catch (error) {
     console.error("[design-vault:delete] failed:", (error as Error).message);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
