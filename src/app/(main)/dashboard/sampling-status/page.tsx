@@ -1,11 +1,5 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { SampleTrackingView } from "@/components/sample-tracking/sample-tracking-view";
 
 export default function SamplingStatusPage() {
-  return (
-    <OperationsScreen
-      mode="sampling-status"
-      title="Sampling Status"
-      description="Track pattern, cutting, stitching, and deadline status."
-    />
-  );
+  return <SampleTrackingView mode="status" />;
 }

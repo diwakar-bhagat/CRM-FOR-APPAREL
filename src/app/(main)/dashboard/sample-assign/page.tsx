@@ -1,11 +1,5 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { SampleTrackingView } from "@/components/sample-tracking/sample-tracking-view";
 
 export default function SampleAssignPage() {
-  return (
-    <OperationsScreen
-      mode="sample-assign"
-      title="Sample Assign"
-      description="Assign pattern, cutting, and stitching masters to active styles."
-    />
-  );
+  return <SampleTrackingView mode="assign" />;
 }

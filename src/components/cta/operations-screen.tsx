@@ -13,7 +13,6 @@ import {
   Columns3,
   Download,
   ExternalLink,
-  FileText,
   Filter,
   ImageIcon,
   Info,
@@ -25,6 +24,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ExportButton } from "@/components/dashboard/export-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -556,11 +556,27 @@ function DataTable({ title, orders, columns }: { title: string; orders: Order[];
 }
 
 function FabricWorking({ orders }: { orders: Order[] }) {
+  const exportRows = orders.slice(0, 22).map((order, index) => ({
+    "Created At": formatDate(order.createdAt),
+    "Our Ref": displayVgRef(index),
+    "Order No": displayVgRef(index),
+    "PO No": `${55713 + index}`,
+    "User Created": designers[index % designers.length],
+    "Order Qty": Number(order.orderQty || 0).toFixed(1),
+    "Qty Unit": "PCS",
+    "Style No": order.styleId ?? "",
+    "Order Date": formatDate(order.deliveryDate),
+    Status: index % 6 === 0 ? "Revised" : "Approved",
+  }));
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold text-2xl">Fabric Reports</h2>
-        <Input className="w-60" placeholder="Filter / Search" />
+        <div className="flex flex-wrap items-center gap-2">
+          <ExportButton data={exportRows} filename="fabric-reports" label="Export All" />
+          <Input className="w-60" placeholder="Filter / Search" />
+        </div>
       </div>
       <Card className="rounded-lg py-0">
         <CardContent className="p-0">
@@ -588,9 +604,12 @@ function FabricWorking({ orders }: { orders: Order[] }) {
               {orders.slice(0, 22).map((order, index) => (
                 <TableRow key={order.id}>
                   <TableCell>
-                    <Button size="icon" variant="outline">
-                      <FileText className="size-4" />
-                    </Button>
+                    <ExportButton
+                      data={[exportRows[index]]}
+                      filename={`fabric-report-${displayVgRef(index).replaceAll("/", "-")}`}
+                      label="Action"
+                      size="sm"
+                    />
                   </TableCell>
                   <TableCell>{formatDate(order.createdAt)}</TableCell>
                   <TableCell>{displayVgRef(index)}</TableCell>

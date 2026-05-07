@@ -2,13 +2,22 @@ import { NextResponse } from "next/server";
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   try {
-    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
-    const urlEndpoint = process.env.IMAGEKIT_URL_ENDPOINT ?? process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT;
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY?.trim();
+    const urlEndpoint = (process.env.IMAGEKIT_URL_ENDPOINT ?? process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT)?.trim();
 
     if (!privateKey || !urlEndpoint) {
       return NextResponse.json({ success: false, error: "ImageKit is not configured" }, { status: 503 });
+    }
+
+    if (!privateKey.startsWith("private_")) {
+      return NextResponse.json(
+        { success: false, error: "ImageKit private key is invalid. Use IMAGEKIT_PRIVATE_KEY=private_xxx in Vercel." },
+        { status: 503 },
+      );
     }
 
     const formData = await request.formData();
@@ -42,6 +51,16 @@ export async function POST(request: Request) {
 
     const payload = (await response.json()) as { url?: string; fileId?: string; name?: string; message?: string };
     if (!response.ok || !payload.url) {
+      if (response.status === 401 || response.status === 403) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "ImageKit rejected the upload credentials. Check IMAGEKIT_PRIVATE_KEY in Vercel and redeploy.",
+          },
+          { status: 503 },
+        );
+      }
+
       return NextResponse.json(
         { success: false, error: payload.message ?? "Image upload failed" },
         { status: response.ok ? 502 : response.status },

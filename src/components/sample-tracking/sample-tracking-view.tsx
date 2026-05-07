@@ -2,7 +2,20 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Clock, Loader2, Package, Play, Plus, Scissors, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock,
+  Loader2,
+  Package,
+  Play,
+  Plus,
+  Route,
+  Scissors,
+  Sparkles,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { ExportButton } from "@/components/dashboard/export-button";
@@ -65,7 +78,34 @@ const emptyForm = {
   preparedBy: "",
 };
 
-export function SampleTrackingView() {
+type SampleModuleMode = "create" | "assign" | "status" | "tracking";
+
+const workflowSteps = [
+  { key: "create", label: "Sample Create", icon: Plus },
+  { key: "assign", label: "Sample Assign", icon: Users },
+  { key: "tracking", label: "Sampling Status / Sample Tracking", icon: ClipboardCheck },
+] as const;
+
+const modeCopy: Record<SampleModuleMode, { title: string; description: string }> = {
+  create: {
+    title: "Sample Create",
+    description: "Create sample requests and seed the lifecycle stages in Neon.",
+  },
+  assign: {
+    title: "Sample Assign",
+    description: "Assign owners to active sample stages before execution starts.",
+  },
+  status: {
+    title: "Sampling Status",
+    description: "Review pending, in-progress, on-hold, and completed sample stages.",
+  },
+  tracking: {
+    title: "Sample Tracking",
+    description: "Track cutting, sewing, finishing, and shipment readiness.",
+  },
+};
+
+export function SampleTrackingView({ mode = "tracking" }: { mode?: SampleModuleMode }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [stageOpen, setStageOpen] = useState(false);
@@ -87,6 +127,18 @@ export function SampleTrackingView() {
   });
 
   const samples = data?.data ?? data?.samples ?? [];
+  const pendingAssignments = samples.reduce(
+    (count, sample) => count + sample.stages.filter((stage) => !stage.assignedTo && stage.status !== "COMPLETED").length,
+    0,
+  );
+  const inProgressCount = samples.reduce(
+    (count, sample) => count + sample.stages.filter((stage) => stage.status === "IN_PROGRESS").length,
+    0,
+  );
+  const completedCount = samples.reduce(
+    (count, sample) => count + sample.stages.filter((stage) => stage.status === "COMPLETED").length,
+    0,
+  );
   const exportRows = samples.map((sample) => ({
     "Our Ref": sample.ourRef,
     Buyer: sample.buyer ?? "",
@@ -154,38 +206,63 @@ export function SampleTrackingView() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <div className="mr-auto">
-          <h1 className="font-semibold text-2xl">Sample Tracking</h1>
-          <p className="text-muted-foreground text-sm">Cutting to shipment lifecycle, persisted in Neon.</p>
+          <h1 className="font-semibold text-2xl">{modeCopy[mode].title}</h1>
+          <p className="text-muted-foreground text-sm">{modeCopy[mode].description}</p>
         </div>
         <ExportButton data={exportRows} filename="sample-tracking" />
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Sample
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Sample Request</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Dept From"><Input value={form.deptFrom} onChange={(e) => setForm({ ...form, deptFrom: e.target.value })} /></Field>
-              <Field label="Item Type"><Input value={form.itemType} onChange={(e) => setForm({ ...form, itemType: e.target.value })} /></Field>
-              <Field label="Buyer"><Input value={form.buyer} onChange={(e) => setForm({ ...form, buyer: e.target.value })} /></Field>
-              <Field label="Season"><Input value={form.season} onChange={(e) => setForm({ ...form, season: e.target.value })} /></Field>
-              <Field label="Merchant"><Input value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} /></Field>
-              <Field label="Prepared By"><Input value={form.preparedBy} onChange={(e) => setForm({ ...form, preparedBy: e.target.value })} /></Field>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button disabled={createMutation.isPending || !form.deptFrom} onClick={() => createMutation.mutate()}>
-                {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create
+        {(mode === "create" || mode === "tracking") && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Sample
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Sample Request</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="Dept From"><Input value={form.deptFrom} onChange={(e) => setForm({ ...form, deptFrom: e.target.value })} /></Field>
+                <Field label="Item Type"><Input value={form.itemType} onChange={(e) => setForm({ ...form, itemType: e.target.value })} /></Field>
+                <Field label="Buyer"><Input value={form.buyer} onChange={(e) => setForm({ ...form, buyer: e.target.value })} /></Field>
+                <Field label="Season"><Input value={form.season} onChange={(e) => setForm({ ...form, season: e.target.value })} /></Field>
+                <Field label="Merchant"><Input value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} /></Field>
+                <Field label="Prepared By"><Input value={form.preparedBy} onChange={(e) => setForm({ ...form, preparedBy: e.target.value })} /></Field>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button disabled={createMutation.isPending || !form.deptFrom} onClick={() => createMutation.mutate()}>
+                  {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        {workflowSteps.map((step) => {
+          const Icon = step.icon;
+          const active =
+            step.key === mode || (step.key === "tracking" && mode === "status");
+          return (
+            <Card key={step.key} className={cn("border-muted bg-muted/20", active && "border-primary bg-primary/5")}>
+              <CardContent className="flex items-center gap-3 p-4">
+                <Icon className={cn("h-5 w-5 text-muted-foreground", active && "text-primary")} />
+                <div>
+                  <div className="font-medium text-sm">{step.label}</div>
+                  <div className="text-muted-foreground text-xs">
+                    {step.key === "create" && `${samples.length} requests`}
+                    {step.key === "assign" && `${pendingAssignments} unassigned stages`}
+                    {step.key === "tracking" && `${inProgressCount} active · ${completedCount} complete`}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -228,6 +305,33 @@ export function SampleTrackingView() {
                 <span className="text-muted-foreground">Progress</span>
                 <span className="font-medium">{sample.stages.filter((stage) => stage.status === "COMPLETED").length}/{sample.stages.length} complete</span>
               </div>
+              {mode === "assign" && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-center gap-2"
+                  onClick={() => {
+                    const nextStage = sample.stages.find((stage) => !stage.assignedTo && stage.status !== "COMPLETED") ?? sample.stages[0];
+                    setSelectedSample(sample);
+                    setSelectedStage(nextStage);
+                    setRemarks(nextStage.remarks ?? "");
+                    setAssignedTo(nextStage.assignedTo ?? "");
+                    setStageOpen(true);
+                  }}
+                >
+                  <Users className="h-4 w-4" />
+                  Assign Next Stage
+                </Button>
+              )}
+              {mode === "status" && (
+                <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                  {(["PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED"] as const).map((status) => (
+                    <div key={status} className={cn("rounded-md border px-2 py-2", statusTone[status])}>
+                      <div className="font-semibold">{sample.stages.filter((stage) => stage.status === status).length}</div>
+                      <div>{status.replaceAll("_", " ")}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -245,6 +349,7 @@ export function SampleTrackingView() {
               <Field label="Assigned To"><Input value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} /></Field>
               <Field label="Remarks"><Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} /></Field>
               <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={() => stageMutation.mutate("PENDING")} disabled={stageMutation.isPending}><Route className="mr-2 h-4 w-4" />Reset</Button>
                 <Button variant="outline" onClick={() => stageMutation.mutate("IN_PROGRESS")} disabled={stageMutation.isPending}><Clock className="mr-2 h-4 w-4" />Start</Button>
                 <Button variant="outline" onClick={() => stageMutation.mutate("ON_HOLD")} disabled={stageMutation.isPending}>Hold</Button>
                 <Button onClick={() => stageMutation.mutate("COMPLETED")} disabled={stageMutation.isPending}><CheckCircle2 className="mr-2 h-4 w-4" />Complete</Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { useSearchParams } from "next/navigation";
 
@@ -91,13 +91,13 @@ const tnaData = [
   },
 ];
 
-const orders = [
-  { id: "ORD-2847", buyer: "Zara UK", product: "Linen Overshirt SS25", status: "delayed" },
-  { id: "ORD-2901", buyer: "H&M EU", product: "Jersey Polo 3-Pack", status: "at-risk" },
-  { id: "ORD-2799", buyer: "ASOS", product: "Relaxed Denim Jacket AW25", status: "delayed" },
-  { id: "ORD-2923", buyer: "Primark", product: "Organic Cotton Tee 6-Pack", status: "on-track" },
-  { id: "ORD-2958", buyer: "Urban Outfitters", product: "Cargo Parachute Trouser", status: "at-risk" },
-];
+type TNAOrderOption = {
+  id: string;
+  refNo: string;
+  buyer: string;
+  product: string;
+  status: "delayed" | "at-risk" | "on-track";
+};
 
 const statusClass: Record<string, string> = {
   "on-track": "bg-status-on-track/10 text-status-on-track border-status-on-track/20",
@@ -117,9 +117,8 @@ const totalDays = differenceInDays(timelineEnd, timelineStart);
 function TNATrackerContent() {
   const searchParams = useSearchParams();
   const orderFromUrl = searchParams.get("order");
-  const initialOrder = orders.some((o) => o.id === orderFromUrl) ? (orderFromUrl as string) : "ORD-2847";
   const [activeTask, setActiveTask] = useState<string | null>(null);
-  const [selectedOrder, setSelectedOrder] = useState(initialOrder);
+  const [selectedOrder, setSelectedOrder] = useState(orderFromUrl ?? "");
   const [activeView, setActiveView] = useState<"pipeline" | "gantt">("pipeline");
 
   const exportData = tnaData.filter((item) => !item.isGroup).map(({ id, color, isGroup, ...rest }) => rest);
@@ -131,7 +130,41 @@ function TNATrackerContent() {
     curr = addDays(curr, 7);
   }
 
-  const selectedOrderInfo = orders.find((o) => o.id === selectedOrder);
+  const { data: ordersData, isLoading: isLoadingOrders } = useQuery({
+    queryKey: ["orders", "tna-options"],
+    queryFn: async () => {
+      const res = await fetch("/api/orders?limit=100");
+      if (!res.ok) throw new Error("Failed to fetch orders");
+      return res.json() as Promise<{ orders?: any[]; data?: any[] }>;
+    },
+    staleTime: 60_000,
+  });
+
+  const orderOptions: TNAOrderOption[] = (ordersData?.orders ?? ordersData?.data ?? []).map((order) => {
+    const status: TNAOrderOption["status"] = order.approvalPending
+      ? "at-risk"
+      : order.pfhStatus && order.pfhStatus !== "approved"
+        ? "delayed"
+        : "on-track";
+    return {
+      id: order.id,
+      refNo: order.refNo ?? order.ref_no ?? order.id,
+      buyer: order.buyer ?? "Unknown buyer",
+      product: order.styleName ?? order.styleId ?? "Untitled style",
+      status,
+    };
+  });
+
+  useEffect(() => {
+    if (orderOptions.length === 0) return;
+    const requested = orderOptions.find((order) => order.id === orderFromUrl || order.refNo === orderFromUrl);
+    const selectedExists = orderOptions.some((order) => order.id === selectedOrder);
+    if (!selectedOrder || !selectedExists) {
+      setSelectedOrder((requested ?? orderOptions[0]).id);
+    }
+  }, [orderFromUrl, orderOptions, selectedOrder]);
+
+  const selectedOrderInfo = orderOptions.find((o) => o.id === selectedOrder);
 
   const { data: orderData, isLoading: isLoadingOrder } = useQuery({
     queryKey: ["orders", selectedOrder],
@@ -140,6 +173,7 @@ function TNATrackerContent() {
       if (!res.ok) throw new Error("Failed to fetch order");
       return res.json();
     },
+    enabled: Boolean(selectedOrder) && orderOptions.some((order) => order.id === selectedOrder),
   });
 
   const realOrder = orderData?.order;
@@ -182,15 +216,15 @@ function TNATrackerContent() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="shrink-0 font-medium text-muted-foreground text-sm">Order TNA:</span>
-          <Select value={selectedOrder} onValueChange={setSelectedOrder}>
+          <Select value={selectedOrder} onValueChange={setSelectedOrder} disabled={isLoadingOrders || orderOptions.length === 0}>
             <SelectTrigger className="h-9 w-[300px] text-sm">
-              <SelectValue />
+              <SelectValue placeholder={isLoadingOrders ? "Loading orders..." : "Select order"} />
             </SelectTrigger>
             <SelectContent>
-              {orders.map((o) => (
+              {orderOptions.map((o) => (
                 <SelectItem key={o.id} value={o.id}>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs">{o.id}</span>
+                    <span className="font-mono text-xs">{o.refNo}</span>
                     <span className="text-muted-foreground">·</span>
                     <span className="text-xs">{o.buyer}</span>
                     <span className="text-muted-foreground">·</span>
@@ -252,7 +286,7 @@ function TNATrackerContent() {
                   </p>
                 </div>
                 <Badge variant="outline" className="font-mono text-xs">
-                  {selectedOrder}
+                  {selectedOrderInfo?.refNo ?? selectedOrder}
                 </Badge>
               </div>
             </CardHeader>
