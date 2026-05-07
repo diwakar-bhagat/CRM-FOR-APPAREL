@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
-import { AlertTriangle, CheckCircle2, ClipboardList, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock, IndianRupee } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -55,6 +55,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 interface KPIData {
   label: string;
   value: number;
+  displayValue?: string;
   delta: { value: number; direction: "up" | "down"; sentiment: "positive" | "negative" };
   icon: LucideIcon;
   status: "default" | "on-track" | "at-risk" | "delayed";
@@ -63,6 +64,16 @@ interface KPIData {
 }
 
 const kpiData: KPIData[] = [
+  {
+    label: "Total Revenue",
+    value: 0,
+    displayValue: "Rs 0",
+    delta: { value: 0, direction: "up", sentiment: "positive" },
+    icon: IndianRupee,
+    status: "default",
+    sparkline: [0, 0, 0, 0, 0, 0, 0],
+    tooltip: "Revenue calculated from the imported Excel order sheet",
+  },
   {
     label: "Total Orders",
     value: 148,
@@ -119,22 +130,31 @@ export function KPICards() {
   const [data, setData] = useState(kpiData);
 
   useEffect(() => {
-    async function fetchOrdersCount() {
+    async function fetchMetrics() {
       try {
-        const res = await fetch("/api/orders");
+        const res = await fetch("/api/dashboard/home-metrics");
         if (res.ok) {
           const json = await res.json();
+          const summary = json.data?.summary;
+          if (!summary) return;
           setData((prev) => {
             const newData = [...prev];
-            newData[0] = { ...newData[0], value: json.count || 148 };
+            newData[0] = {
+              ...newData[0],
+              value: Number(summary.totalRevenue ?? 0),
+              displayValue: formatCompactCurrency(Number(summary.totalRevenue ?? 0)),
+            };
+            newData[1] = { ...newData[1], value: Number(summary.totalOrders ?? 0) };
+            newData[2] = { ...newData[2], value: Math.max(0, Number(summary.totalOrders ?? 0) - Number(summary.atRiskOrders ?? 0) - Number(summary.delayedOrders ?? 0)) };
+            newData[3] = { ...newData[3], value: Number(summary.atRiskOrders ?? 0) + Number(summary.delayedOrders ?? 0) };
             return newData;
           });
         }
       } catch (err) {
-        console.error("Failed to fetch total orders count", err);
+        console.error("Failed to fetch dashboard metrics", err);
       }
     }
-    void fetchOrdersCount();
+    void fetchMetrics();
   }, []);
 
   return (
@@ -196,7 +216,9 @@ function KPICard({ kpi, index }: { kpi: KPIData; index: number }) {
 
               <div className="flex items-end justify-between gap-2">
                 <div className="flex flex-col gap-1.5">
-                  <span className="font-semibold text-3xl tabular-nums leading-none tracking-tight">{count}</span>
+                  <span className="font-semibold text-3xl tabular-nums leading-none tracking-tight">
+                    {kpi.displayValue ?? count}
+                  </span>
                   <div className="flex items-center gap-1.5">
                     <span
                       className={`size-1 rounded-full ${kpi.delta.sentiment === "positive" ? "bg-status-on-track" : "bg-status-delayed"}`}
@@ -220,4 +242,10 @@ function KPICard({ kpi, index }: { kpi: KPIData; index: number }) {
       </TooltipContent>
     </Tooltip>
   );
+}
+
+function formatCompactCurrency(value: number) {
+  if (value >= 10_000_000) return `Rs ${(value / 10_000_000).toFixed(2)}Cr`;
+  if (value >= 100_000) return `Rs ${(value / 100_000).toFixed(2)}L`;
+  return `Rs ${Math.round(value).toLocaleString("en-IN")}`;
 }

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Plus } from 'lucide-react';
+import { AlertCircle, Check, Layers, Plus, Save } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -133,29 +134,43 @@ export function MaterialRequisitionView() {
       if (!res.ok) throw new Error('Failed to create requisition');
       setForm(emptyForm);
       setOpen(false);
+      toast.success('Material requisition created');
       await refetch();
+    } catch (error) {
+      toast.error((error as Error).message);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle>Material Requisitions</CardTitle>
+    <Card className="overflow-hidden border-white/10 bg-card/75 shadow-xl shadow-black/5 backdrop-blur-xl">
+      <CardHeader className="flex flex-row items-center justify-between gap-4 border-b bg-muted/25">
+        <div>
+          <CardTitle>Material Requisitions</CardTitle>
+          <p className="mt-1 text-muted-foreground text-sm">Live Neon records with fabric, trim, and accessory line items.</p>
+        </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">
+            <Button size="sm" className="gap-2">
               <Plus className="mr-2 h-4 w-4" />
               New Requisition
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>New Material Requisition</DialogTitle>
+          <DialogContent className="max-h-[90vh] overflow-y-auto border-white/15 bg-background/90 shadow-2xl backdrop-blur-2xl sm:max-w-5xl">
+            <DialogHeader className="rounded-lg border border-white/10 bg-muted/30 px-4 py-3">
+              <DialogTitle className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-primary" />
+                New Material Requisition
+              </DialogTitle>
             </DialogHeader>
             <form onSubmit={submit} className="grid gap-4">
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg border border-white/10 bg-card/60 p-4 backdrop-blur-xl">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="font-medium text-sm">Header</div>
+                  <div className="text-muted-foreground text-xs">CTA APPARELS PVT. LTD.</div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
                 <Field label="Req. No."><Input value={form.requisitionNo} onChange={(e) => updateField('requisitionNo', e.target.value)} placeholder="MR-0001" /></Field>
                 <Field label="Date"><Input required type="date" value={form.requisitionDate} onChange={(e) => updateField('requisitionDate', e.target.value)} /></Field>
                 <Field label="Type"><Input required value={form.reqnType} onChange={(e) => updateField('reqnType', e.target.value)} /></Field>
@@ -166,9 +181,13 @@ export function MaterialRequisitionView() {
                 <Field label="Prepared By"><Input value={form.preparedBy} onChange={(e) => updateField('preparedBy', e.target.value)} /></Field>
                 <Field label="Dept From"><Input value={form.deptFrom} onChange={(e) => updateField('deptFrom', e.target.value)} /></Field>
                 <Field label="Dept To"><Input value={form.deptTo} onChange={(e) => updateField('deptTo', e.target.value)} /></Field>
+                </div>
               </div>
-              <div className="rounded-md border p-4">
-                <div className="mb-3 text-sm font-medium">Item</div>
+              <div className="rounded-lg border border-white/10 bg-card/60 p-4 backdrop-blur-xl">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="font-medium text-sm">Item</div>
+                  <div className="rounded-full border bg-muted px-2 py-1 text-muted-foreground text-xs">1 line</div>
+                </div>
                 <div className="grid gap-3 md:grid-cols-4">
                   <Field label="Category"><Input required value={form.itemCategory} onChange={(e) => updateField('itemCategory', e.target.value)} /></Field>
                   <Field label="Description"><Input required value={form.itemDesc} onChange={(e) => updateField('itemDesc', e.target.value)} placeholder="Cotton fabric 40s" /></Field>
@@ -183,7 +202,10 @@ export function MaterialRequisitionView() {
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Requisition'}</Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? <Save className="mr-2 h-4 w-4 animate-pulse" /> : <Check className="mr-2 h-4 w-4" />}
+                  {saving ? 'Saving...' : 'Save Requisition'}
+                </Button>
               </div>
             </form>
           </DialogContent>

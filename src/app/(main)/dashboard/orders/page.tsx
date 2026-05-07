@@ -32,6 +32,7 @@ type OrderStatus = "on-track" | "at-risk" | "delayed" | "completed";
 
 interface Order {
   id: string;
+  refNo?: string;
   buyer: string;
   product: string;
   stage: string;
@@ -40,6 +41,7 @@ interface Order {
   status: OrderStatus;
   vendor: string;
   quantity: number;
+  amountValue?: number;
   amount: string;
   imageUrl?: string;
 }
@@ -253,7 +255,7 @@ function GridOrderCard({ order }: { order: Order }) {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-border/40 bg-surface-2/50 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-              {order.id}
+              {order.refNo ?? order.id}
             </span>
             <div className="flex items-center gap-1.5 rounded-full border border-white/5 bg-surface-2/30 px-2 py-0.5">
               <span className={`size-1.5 rounded-full ${statusStyles[order.status].dot}`} />
@@ -333,7 +335,7 @@ function ListOrderRow({ order }: { order: Order }) {
     >
       <div className="w-[120px] shrink-0">
         <span className="rounded-full border border-border/40 bg-surface-2/50 px-2 py-0.5 font-bold font-mono text-[10px] text-muted-foreground">
-          {order.id}
+          {order.refNo ?? order.id}
         </span>
       </div>
 
@@ -428,16 +430,18 @@ export default function OrdersPage() {
       if (!res.ok) throw new Error("Failed to fetch orders");
       const json = await res.json();
       return json.orders.map((o: any) => ({
-        id: o.ref_no || o.id,
+        id: o.id,
+        refNo: o.refNo ?? o.ref_no,
         buyer: o.buyer,
         product: o.style_name || o.style_id,
-        stage: "Production",
-        daysLeft: 14,
-        progress: 50,
-        status: "on-track" as OrderStatus,
-        vendor: o.brand || "N/A",
+        stage: o.fabricStatus === "INHOUSE" || o.trimStatus === "INHOUSE" ? "Production" : "Sourcing",
+        daysLeft: o.deliveryDate ? Math.ceil((new Date(o.deliveryDate).getTime() - Date.now()) / 86_400_000) : 0,
+        progress: Number(o.productionQty ?? 0) > 0 && Number(o.orderQty ?? 0) > 0 ? Math.min(100, Math.round((Number(o.productionQty) / Number(o.orderQty)) * 100)) : 0,
+        status: o.approvalPending ? "at-risk" : o.deliveryDate && new Date(o.deliveryDate) < new Date() ? "delayed" : "on-track",
+        vendor: o.fabricSupplier || o.brand || "N/A",
         quantity: o.order_qty,
-        amount: formatCurrency(0),
+        amountValue: Number(o.revenueValue ?? o.revenue_value ?? 0),
+        amount: formatCurrency(Number(o.revenueValue ?? o.revenue_value ?? 0), { noDecimals: true }),
         imageUrl: o.image_url
       })) as Order[];
     }
@@ -445,10 +449,10 @@ export default function OrdersPage() {
 
   const filteredOrders = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const sourceOrders = backendOrders.length > 0 ? backendOrders : orders;
+    const sourceOrders = backendOrders;
     if (!needle) return sourceOrders;
     return sourceOrders.filter((order) =>
-      [order.id, order.buyer, order.product, order.vendor, order.stage].some((value) =>
+      [order.refNo ?? order.id, order.buyer, order.product, order.vendor, order.stage].some((value) =>
         value.toLowerCase().includes(needle),
       ),
     );
@@ -479,10 +483,10 @@ export default function OrdersPage() {
 
       {/* KPI Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Active Volume" value={formatCurrency(1_82_00_000, { noDecimals: true })} change="+12.5%" trend="up" />
-        <MetricCard label="Units in Prod" value="1.42L" change="+8.2%" trend="up" />
-        <MetricCard label="At Risk Value" value={formatCurrency(28_50_000, { noDecimals: true })} change="-4.1%" trend="down" />
-        <MetricCard label="Vendor Efficiency" value="94%" change="+1.2%" trend="up" />
+        <MetricCard label="Active Revenue" value={formatCurrency(filteredOrders.reduce((sum, order) => sum + Number(order.amountValue || 0), 0), { noDecimals: true })} change="Excel import" trend="up" />
+        <MetricCard label="Units in Prod" value={filteredOrders.reduce((sum, order) => sum + Number(order.quantity || 0), 0).toLocaleString("en-IN")} change="Live DB" trend="up" />
+        <MetricCard label="At Risk Orders" value={filteredOrders.filter((order) => order.status === "at-risk" || order.status === "delayed").length.toString()} change="Dynamic" trend="down" />
+        <MetricCard label="Buyers" value={new Set(filteredOrders.map((order) => order.buyer)).size.toString()} change="Live DB" trend="up" />
       </div>
 
       {/* Controls Row */}

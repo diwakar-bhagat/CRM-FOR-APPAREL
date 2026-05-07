@@ -10,7 +10,16 @@ export async function ensureOrdersTable() {
       style_id TEXT,
       style_name TEXT,
       order_qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+      fob_value NUMERIC(12,4),
+      sam_value NUMERIC(12,4),
+      revenue_value NUMERIC(14,2) NOT NULL DEFAULT 0,
       delivery_date TIMESTAMPTZ,
+      source_sheet TEXT,
+      fabric_supplier TEXT,
+      fabric_status TEXT,
+      trim_status TEXT,
+      production_qty NUMERIC(12,2),
+      finishing_qty NUMERIC(12,2),
       pfh_status TEXT NOT NULL DEFAULT 'PENDING',
       sop_status TEXT NOT NULL DEFAULT 'PENDING',
       ppm_status TEXT NOT NULL DEFAULT 'PENDING',
@@ -28,7 +37,16 @@ export async function ensureOrdersTable() {
       ADD COLUMN IF NOT EXISTS style_id TEXT,
       ADD COLUMN IF NOT EXISTS style_name TEXT,
       ADD COLUMN IF NOT EXISTS order_qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS fob_value NUMERIC(12,4),
+      ADD COLUMN IF NOT EXISTS sam_value NUMERIC(12,4),
+      ADD COLUMN IF NOT EXISTS revenue_value NUMERIC(14,2) NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS delivery_date TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS source_sheet TEXT,
+      ADD COLUMN IF NOT EXISTS fabric_supplier TEXT,
+      ADD COLUMN IF NOT EXISTS fabric_status TEXT,
+      ADD COLUMN IF NOT EXISTS trim_status TEXT,
+      ADD COLUMN IF NOT EXISTS production_qty NUMERIC(12,2),
+      ADD COLUMN IF NOT EXISTS finishing_qty NUMERIC(12,2),
       ADD COLUMN IF NOT EXISTS pfh_status TEXT NOT NULL DEFAULT 'PENDING',
       ADD COLUMN IF NOT EXISTS sop_status TEXT NOT NULL DEFAULT 'PENDING',
       ADD COLUMN IF NOT EXISTS ppm_status TEXT NOT NULL DEFAULT 'PENDING',
@@ -37,6 +55,9 @@ export async function ensureOrdersTable() {
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_source_sheet ON public.orders(source_sheet)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_revenue_value ON public.orders(revenue_value)`;
 }
 
 export async function ensureOrderProcessTable() {
@@ -68,6 +89,53 @@ export async function ensureOrderProcessTable() {
       ppm INTEGER,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
+  `;
+}
+
+export async function ensureInventoryTables() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS public.inventory_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      item_type TEXT NOT NULL,
+      category TEXT NOT NULL,
+      sub_category TEXT NOT NULL,
+      item_name TEXT NOT NULL,
+      width TEXT,
+      storage_method TEXT,
+      supplier TEXT,
+      stock_qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+      reserved_qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+      unit TEXT NOT NULL DEFAULT 'MTR',
+      reorder_level NUMERIC(12,2) NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'HEALTHY',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(item_type, category, sub_category, item_name, width)
+    )
+  `;
+
+  const existing = await sql`SELECT COUNT(*)::int AS count FROM public.inventory_items`;
+  if (Number(existing[0]?.count ?? 0) > 0) return;
+
+  await sql`
+    INSERT INTO public.inventory_items (
+      item_type, category, sub_category, item_name, width, storage_method, supplier, stock_qty, reserved_qty, unit, reorder_level, status
+    ) VALUES
+      ('TRIM', 'Ribbon & Tape', 'Satin', 'Satin ribbon roll', '1/4"', 'Wrapped on cardboard cards in labeled bins', 'CTA Store', 420, 95, 'MTR', 120, 'HEALTHY'),
+      ('TRIM', 'Ribbon & Tape', 'Grosgrain', 'Grosgrain tape', '1/2"', 'Spool storage by width', 'CTA Store', 180, 72, 'MTR', 100, 'WATCH'),
+      ('TRIM', 'Ribbon & Tape', 'Velvet', 'Velvet tape', '1/2"', 'Rolled on comic boards', 'Local Supplier', 90, 45, 'MTR', 80, 'WATCH'),
+      ('TRIM', 'Lace & Edging', 'Chantilly lace', 'Chantilly lace edging', '2"', 'Flat wrapped with tissue separators', 'Lace House', 65, 38, 'MTR', 75, 'LOW'),
+      ('TRIM', 'Lace & Edging', 'Scalloped edges', 'Scalloped lace trim', '1"', 'Hanging sample cards plus bin stock', 'Lace House', 210, 70, 'MTR', 90, 'HEALTHY'),
+      ('TRIM', 'Lace & Edging', 'Beaded lace', 'Beaded lace trim', '1.5"', 'Padded roll storage', 'Premium Trims', 44, 22, 'MTR', 60, 'LOW'),
+      ('TRIM', 'Fringe & Tassels', 'Chainette fringe', 'Chainette fringe roll', '3"', 'Spool storage to prevent tangling', 'Trim Craft', 155, 40, 'MTR', 70, 'HEALTHY'),
+      ('TRIM', 'Fringe & Tassels', 'Loop trimming', 'Loop trimming tape', '1"', 'Clear bins by usage', 'Trim Craft', 120, 35, 'MTR', 60, 'HEALTHY'),
+      ('TRIM', 'Functional Trims', 'Elastic', 'Knitted elastic', '3/8"', 'Spools stacked by width', 'Functional Supply', 520, 180, 'MTR', 200, 'HEALTHY'),
+      ('TRIM', 'Functional Trims', 'Zippers', 'Nylon zipper', '8"', 'Drawer bins by size and color', 'Functional Supply', 730, 210, 'PCS', 250, 'HEALTHY'),
+      ('TRIM', 'Functional Trims', 'Buttons', 'Shell buttons', '18L', 'Small part drawers by line', 'Button House', 2200, 640, 'PCS', 800, 'HEALTHY'),
+      ('FABRIC', 'Core Fabric', 'Cotton', 'Cotton poplin', '44"', 'Roll rack by buyer and width', 'CTA', 2600, 1100, 'MTR', 900, 'HEALTHY'),
+      ('FABRIC', 'Core Fabric', 'Linen', 'Linen blend', '52"', 'Roll rack with shade tags', 'CTA', 740, 510, 'MTR', 650, 'WATCH'),
+      ('FABRIC', 'Surface Fabric', 'Jacquard', 'Jacquard fabric', '48"', 'Roll rack by design code', 'Premium Mill', 380, 310, 'MTR', 400, 'LOW')
+    ON CONFLICT (item_type, category, sub_category, item_name, width) DO NOTHING
   `;
 }
 

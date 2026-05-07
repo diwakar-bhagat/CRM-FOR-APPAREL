@@ -61,8 +61,26 @@ export async function GET(request: Request) {
         o.style_name AS "styleName",
         o.order_qty,
         o.order_qty AS "orderQty",
+        o.fob_value,
+        o.fob_value AS "fobValue",
+        o.sam_value,
+        o.sam_value AS "samValue",
+        o.revenue_value,
+        o.revenue_value AS "revenueValue",
         o.delivery_date,
         o.delivery_date AS "deliveryDate",
+        o.source_sheet,
+        o.source_sheet AS "sourceSheet",
+        o.fabric_supplier,
+        o.fabric_supplier AS "fabricSupplier",
+        o.fabric_status,
+        o.fabric_status AS "fabricStatus",
+        o.trim_status,
+        o.trim_status AS "trimStatus",
+        o.production_qty,
+        o.production_qty AS "productionQty",
+        o.finishing_qty,
+        o.finishing_qty AS "finishingQty",
         o.pfh_status,
         o.pfh_status AS "pfhStatus",
         o.sop_status,
@@ -124,7 +142,7 @@ export async function POST(req: Request) {
     const data = await req.json() as any;
     const rows = await sql`
       INSERT INTO public.orders (
-        ref_no, buyer, brand, style_id, style_name, order_qty, delivery_date
+        ref_no, buyer, brand, style_id, style_name, order_qty, fob_value, sam_value, revenue_value, delivery_date
       ) VALUES (
         ${data.refNo ?? data.ref_no},
         ${data.buyer},
@@ -132,6 +150,9 @@ export async function POST(req: Request) {
         ${data.styleNo ?? data.styleId ?? data.style_id ?? null},
         ${data.styleName ?? data.style_name ?? null},
         ${Number(data.orderQty ?? data.order_qty ?? 0)},
+        ${data.fobValue ?? data.fob_value ?? null},
+        ${data.samValue ?? data.sam_value ?? null},
+        ${Number(data.revenueValue ?? data.revenue_value ?? 0)},
         ${data.deliveryDate ? new Date(data.deliveryDate) : null}
       )
       RETURNING
@@ -146,6 +167,9 @@ export async function POST(req: Request) {
         style_name AS "styleName",
         order_qty,
         order_qty AS "orderQty",
+        fob_value AS "fobValue",
+        sam_value AS "samValue",
+        revenue_value AS "revenueValue",
         delivery_date,
         delivery_date AS "deliveryDate"
     `;

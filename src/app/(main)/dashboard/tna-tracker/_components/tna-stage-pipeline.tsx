@@ -369,19 +369,22 @@ export function TNAStagePipeline({ order }: { order: Order & { derivedSignals?: 
     },
     {
       id: "s3",
-      name: "Production",
+      name: "Bulk Processing",
       icon: Package,
       status: order.sopStatus === "completed" ? "completed" : order.sopStatus === "in_progress" ? "active" : "pending",
       deadline: subDays(new Date(order.deliveryDate), 10),
       completionPct: order.sopStatus === "completed" ? 100 : order.sopStatus === "in_progress" ? 45 : 0,
       responsible: "Apex Fabrics Ltd",
       subtasks: [
+        { id: "st8a", label: "Pre-production: tech packs, materials, final production sample", done: true },
+        { id: "st8b", label: "Marker making and cutting plan to reduce fabric waste", done: order.sopStatus === "in_progress" || order.sopStatus === "completed" },
         {
           id: "st9",
-          label: "Bulk fabric cutting",
+          label: "Production and sewing line execution",
           done: order.sopStatus === "in_progress" || order.sopStatus === "completed",
         },
-        { id: "st11", label: "In-line QC inspection", done: order.sopStatus === "completed" },
+        { id: "st11", label: "Quality inspection: in-line, final, stitching, measurements", done: order.sopStatus === "completed" },
+        { id: "st12", label: "Finishing and packing: ironing, tag removal, folding, polybags", done: order.sopStatus === "completed" },
       ],
     },
     {

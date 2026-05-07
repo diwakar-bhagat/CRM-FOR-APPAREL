@@ -1,11 +1,5 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { FabricTrimInventoryView } from "@/components/inventory/fabric-trim-inventory-view";
 
 export default function InventoryPage() {
-  return (
-    <OperationsScreen
-      mode="inventory"
-      title="Fabric and Trim Inventory"
-      description="Inventory health, stock pressure, and supplier coverage."
-    />
-  );
+  return <FabricTrimInventoryView />;
 }
