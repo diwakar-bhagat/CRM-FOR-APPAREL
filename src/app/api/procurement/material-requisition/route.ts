@@ -1,35 +1,28 @@
-import { z } from 'zod';
-import { ok, created, serverError, validationError } from '@/lib/api-response';
-import { createMaterialRequisitionSchema, paginationQuerySchema } from "@/lib/erp-api";
+import { created, serverError, validationError } from '@/lib/api-response';
+import { createMaterialRequisitionSchema } from "@/lib/erp-api";
 import { ensureMaterialRequisitionTables } from "@/lib/cta-schema";
 import { sql } from "@/lib/db";
 import { randomUUID } from "node:crypto";
-
-const getMaterialRequisitionSchema = paginationQuerySchema.extend({
-  type: z.string().optional(),
-  location: z.string().optional(),
-  year: z.string().optional(),
-});
 
 export async function GET(request: Request) {
   try {
     await ensureMaterialRequisitionTables();
 
     const url = new URL(request.url);
-    const params = {
-      type: url.searchParams.get("type"),
-      location: url.searchParams.get("location"),
-      year: url.searchParams.get("year"),
-      page: url.searchParams.get("page"),
-      limit: url.searchParams.get("limit"),
+    const normalizeText = (value: string | null) => {
+      if (!value) return null;
+      const trimmed = value.trim();
+      if (!trimmed || trimmed.toLowerCase() === "all") return null;
+      return trimmed;
     };
-
-    const parsed = getMaterialRequisitionSchema.safeParse(params);
-    if (!parsed.success) {
-      return validationError(parsed.error);
-    }
-
-    const { type, location, year, page, limit } = parsed.data;
+    const type = normalizeText(url.searchParams.get("type"));
+    const location = normalizeText(url.searchParams.get("location"));
+    const year = normalizeText(url.searchParams.get("year"));
+    const pageParam = Number(url.searchParams.get("page") ?? 1);
+    const limitParam = Number(url.searchParams.get("limit") ?? 100);
+    const page = Number.isFinite(pageParam) && pageParam >= 1 ? Math.floor(pageParam) : 1;
+    const limit =
+      Number.isFinite(limitParam) && limitParam >= 1 ? Math.min(500, Math.floor(limitParam)) : 100;
 
     const [yearStart, yearEnd] = year?.includes("-") ? year.split("-") : [];
     const startDate = yearStart && yearEnd ? new Date(`${yearStart}-04-01`) : null;

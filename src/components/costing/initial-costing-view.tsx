@@ -37,6 +37,18 @@ const emptyForm = {
   styleNo: "",
   styleName: "",
   orderQty: "0",
+  yarnCostPerKg: "0",
+  totalWeightKg: "0",
+  yarnWastePct: 5,
+  fabricPricePerMeter: "0",
+  fabricQuantity: "0",
+  fabricWastagePct: 7,
+  sizingCost: "6",
+  weavingCost: "18",
+  inspectionCost: "2.5",
+  dyeingCost: "0",
+  printingCost: "0",
+  treatmentCost: "0",
   fabricCost: "0",
   trimCost: "0",
   processCost: "0",
@@ -62,17 +74,29 @@ export function InitialCostingView() {
     },
   });
 
-  const base = useMemo(
-    () => ["fabricCost", "trimCost", "processCost", "embroideryCost", "washingCost", "overhead"].reduce((sum, key) => sum + Number(form[key as keyof typeof form] ?? 0), 0),
-    [form],
-  );
-  const finalFob = base * (1 + form.margin / 100);
+  const computed = useMemo(() => {
+    const rawMaterialCost = Number(form.yarnCostPerKg) * Number(form.totalWeightKg) * (1 + form.yarnWastePct / 100);
+    const formulaFabricCost =
+      Number(form.fabricPricePerMeter) * Number(form.fabricQuantity) * (1 + form.fabricWastagePct / 100);
+    const fabricCost = formulaFabricCost > 0 ? formulaFabricCost : rawMaterialCost > 0 ? rawMaterialCost : Number(form.fabricCost);
+    const conversionCost =
+      Number(form.fabricQuantity || form.orderQty) *
+      (Number(form.sizingCost) + Number(form.weavingCost) + Number(form.inspectionCost));
+    const processCost = conversionCost > 0 ? conversionCost : Number(form.processCost);
+    const finishingCost = Number(form.dyeingCost) + Number(form.printingCost) + Number(form.treatmentCost);
+    const washingCost = finishingCost > 0 ? finishingCost : Number(form.washingCost);
+    const base =
+      fabricCost + Number(form.trimCost) + processCost + Number(form.embroideryCost) + washingCost + Number(form.overhead);
+    const finalFob = base * (1 + form.margin / 100);
+    return { rawMaterialCost, formulaFabricCost, fabricCost, conversionCost, processCost, finishingCost, washingCost, base, finalFob };
+  }, [form]);
+
   const breakdown = [
-    { name: "Fabric", value: Number(form.fabricCost) },
+    { name: "Fabric", value: computed.fabricCost },
     { name: "Trim", value: Number(form.trimCost) },
-    { name: "Process", value: Number(form.processCost) },
+    { name: "Conversion", value: computed.processCost },
     { name: "Embroidery", value: Number(form.embroideryCost) },
-    { name: "Washing", value: Number(form.washingCost) },
+    { name: "Finishing", value: computed.washingCost },
     { name: "Overhead", value: Number(form.overhead) },
   ];
 
@@ -112,19 +136,66 @@ export function InitialCostingView() {
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
             <DialogHeader><DialogTitle>New Initial Costing</DialogTitle></DialogHeader>
             <div className="grid gap-4 md:grid-cols-[1fr_280px]">
-              <div className="grid gap-3 md:grid-cols-2">
-                {(["buyer", "styleNo", "styleName", "orderQty", "fabricCost", "trimCost", "processCost", "embroideryCost", "washingCost", "overhead"] as const).map((key) => (
-                  <Field key={key} label={key.replace(/([A-Z])/g, " $1")}>
-                    <Input value={String(form[key])} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
-                  </Field>
-                ))}
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {(["buyer", "styleNo", "styleName", "orderQty"] as const).map((key) => (
+                    <Field key={key} label={key.replace(/([A-Z])/g, " $1")}>
+                      <Input value={String(form[key])} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+                    </Field>
+                  ))}
+                </div>
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">Fabric Cost</CardTitle></CardHeader>
+                  <CardContent className="grid gap-3 md:grid-cols-3">
+                    <Field label="Yarn Cost / Kg"><Input type="number" value={form.yarnCostPerKg} onChange={(e) => setForm({ ...form, yarnCostPerKg: e.target.value })} /></Field>
+                    <Field label="Total Weight Kg"><Input type="number" value={form.totalWeightKg} onChange={(e) => setForm({ ...form, totalWeightKg: e.target.value })} /></Field>
+                    <div className="space-y-3">
+                      <Label>Yarn Waste: {form.yarnWastePct}%</Label>
+                      <Slider value={[form.yarnWastePct]} min={2} max={7} step={0.5} onValueChange={([value]) => setForm({ ...form, yarnWastePct: value ?? 5 })} />
+                    </div>
+                    <Field label="Fabric Price / Meter"><Input type="number" value={form.fabricPricePerMeter} onChange={(e) => setForm({ ...form, fabricPricePerMeter: e.target.value })} /></Field>
+                    <Field label="Quantity Meter"><Input type="number" value={form.fabricQuantity} onChange={(e) => setForm({ ...form, fabricQuantity: e.target.value })} /></Field>
+                    <div className="space-y-3">
+                      <Label>Fabric Wastage: {form.fabricWastagePct}%</Label>
+                      <Slider value={[form.fabricWastagePct]} min={5} max={10} step={0.5} onValueChange={([value]) => setForm({ ...form, fabricWastagePct: value ?? 7 })} />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">Conversion and Finishing</CardTitle></CardHeader>
+                  <CardContent className="grid gap-3 md:grid-cols-3">
+                    <Field label="Sizing / Unit"><Input type="number" value={form.sizingCost} onChange={(e) => setForm({ ...form, sizingCost: e.target.value })} /></Field>
+                    <Field label="Weaving / Unit"><Input type="number" value={form.weavingCost} onChange={(e) => setForm({ ...form, weavingCost: e.target.value })} /></Field>
+                    <Field label="Inspection / Unit"><Input type="number" value={form.inspectionCost} onChange={(e) => setForm({ ...form, inspectionCost: e.target.value })} /></Field>
+                    <Field label="Dyeing"><Input type="number" value={form.dyeingCost} onChange={(e) => setForm({ ...form, dyeingCost: e.target.value })} /></Field>
+                    <Field label="Printing"><Input type="number" value={form.printingCost} onChange={(e) => setForm({ ...form, printingCost: e.target.value })} /></Field>
+                    <Field label="Treatments"><Input type="number" value={form.treatmentCost} onChange={(e) => setForm({ ...form, treatmentCost: e.target.value })} /></Field>
+                  </CardContent>
+                </Card>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {(["trimCost", "embroideryCost", "overhead"] as const).map((key) => (
+                    <Field key={key} label={key.replace(/([A-Z])/g, " $1")}>
+                      <Input type="number" value={String(form[key])} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+                    </Field>
+                  ))}
+                </div>
                 <div className="space-y-3 md:col-span-2">
                   <Label>Margin: {form.margin}%</Label>
                   <Slider value={[form.margin]} min={0} max={60} step={1} onValueChange={([value]) => setForm({ ...form, margin: value ?? 0 })} />
-                  <Badge className={form.margin < 15 ? "bg-red-600" : "bg-emerald-600"}>FOB {finalFob.toFixed(2)}</Badge>
+                  <Badge className={form.margin < 15 ? "bg-red-600" : "bg-emerald-600"}>FOB {computed.finalFob.toFixed(2)}</Badge>
                 </div>
               </div>
-              <Card><CardContent className="h-72 p-4"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={breakdown} dataKey="value" nameKey="name">{breakdown.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></CardContent></Card>
+              <Card>
+                <CardContent className="space-y-3 p-4">
+                  <div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={breakdown} dataKey="value" nameKey="name">{breakdown.map((entry, i) => <Cell key={entry.name} fill={colors[i % colors.length]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div>
+                  <CostLine label="Raw Material" value={computed.rawMaterialCost} />
+                  <CostLine label="Fabric Formula" value={computed.formulaFabricCost} />
+                  <CostLine label="Conversion" value={computed.processCost} />
+                  <CostLine label="Finishing" value={computed.washingCost} />
+                  <CostLine label="Base Cost" value={computed.base} />
+                  <CostLine label="FOB" value={computed.finalFob} strong />
+                </CardContent>
+              </Card>
             </div>
             <div className="flex justify-end"><Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !form.buyer || !form.styleNo}>Save Costing</Button></div>
           </DialogContent>
@@ -139,5 +210,14 @@ export function InitialCostingView() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><Label className="capitalize text-muted-foreground text-xs">{label}</Label>{children}</div>;
+  return <div className="space-y-1.5"><Label className="text-muted-foreground text-xs capitalize">{label}</Label>{children}</div>;
+}
+
+function CostLine({ label, value, strong = false }: { label: string; value: number; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={strong ? "font-semibold text-lg" : "font-medium"}>{value.toFixed(2)}</span>
+    </div>
+  );
 }

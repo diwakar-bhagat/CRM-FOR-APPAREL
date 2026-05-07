@@ -1,11 +1,5 @@
-import { OperationsScreen } from "@/components/cta/operations-screen";
+import { ProductionWipView } from "@/components/production/production-wip-view";
 
 export default function ProductionPage() {
-  return (
-    <OperationsScreen
-      mode="production"
-      title="Production and WIP"
-      description="Live production queue and WIP status by style."
-    />
-  );
+  return <ProductionWipView />;
 }

@@ -1,29 +1,17 @@
-import { z } from 'zod';
-import { ok, serverError, validationError } from '@/lib/api-response';
-import { paginationQuerySchema } from '@/lib/erp-api';
+import { ok, serverError } from '@/lib/api-response';
 import { sql } from "@/lib/db";
 import { ensureNotificationsTable } from "@/lib/cta-schema";
-
-const getNotificationsSchema = paginationQuerySchema.extend({
-  read: z.enum(['true', 'false']).optional(),
-});
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const params = {
-      read: url.searchParams.get("read"),
-      page: url.searchParams.get("page"),
-      limit: url.searchParams.get("limit"),
-    };
-
-    const parsed = getNotificationsSchema.safeParse(params);
-    if (!parsed.success) {
-      return validationError(parsed.error);
-    }
-
-    const { read, page, limit } = parsed.data;
-    const isRead = read === undefined ? null : read === "true";
+    const readParam = url.searchParams.get("read");
+    const isRead = readParam === "true" ? true : readParam === "false" ? false : null;
+    const pageParam = Number(url.searchParams.get("page") ?? 1);
+    const limitParam = Number(url.searchParams.get("limit") ?? 100);
+    const page = Number.isFinite(pageParam) && pageParam >= 1 ? Math.floor(pageParam) : 1;
+    const limit =
+      Number.isFinite(limitParam) && limitParam >= 1 ? Math.min(500, Math.floor(limitParam)) : 100;
     const skip = (page - 1) * limit;
 
     await ensureNotificationsTable();

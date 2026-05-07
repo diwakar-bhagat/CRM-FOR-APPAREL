@@ -1,8 +1,16 @@
 import { z } from "zod";
 
+const coerceQueryNumber = (fallback: number, schema: z.ZodNumber) =>
+  z.preprocess((value) => {
+    if (value === undefined || value === null || value === "") {
+      return fallback;
+    }
+    return value;
+  }, z.coerce.number().pipe(schema));
+
 export const paginationQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(500).default(100),
+  page: coerceQueryNumber(1, z.number().int().min(1)),
+  limit: coerceQueryNumber(100, z.number().int().min(1).max(500)),
 });
 
 export const createOrderSchema = z.object({
